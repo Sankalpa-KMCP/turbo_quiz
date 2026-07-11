@@ -172,6 +172,71 @@ export function isRepositoryError(error: unknown): error is RepositoryError {
 }
 
 /**
+ * Private helper to detect both real and serialized repository errors.
+ */
+export function isRepositoryOrSerializedError(error: unknown): boolean {
+  if (isRepositoryError(error)) {
+    return true
+  }
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>
+    return (
+      typeof obj.code === 'string' &&
+      ['DUPLICATE_NAME', 'NOT_FOUND', 'VALIDATION_ERROR', 'INVALID_RELATIONSHIP', 'PERSISTENCE_ERROR'].includes(obj.code)
+    )
+  }
+  return false
+}
+
+/**
+ * Restores or reconstructs the proper RepositoryError subclass instance
+ * to solve prototype chain loss during Dexie transaction abort errors.
+ */
+export function reconstructRepositoryError(error: unknown): unknown {
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>
+    if (typeof obj.code === 'string') {
+      switch (obj.code) {
+        case 'DUPLICATE_NAME':
+          return new DuplicateNameError(
+            String(obj.entityType || ''),
+            String(obj.conflictingValue || ''),
+            String(obj.field || 'name'),
+            obj.cause
+          )
+        case 'NOT_FOUND':
+          return new NotFoundError(
+            String(obj.entityType || ''),
+            Number(obj.entityId || 0),
+            obj.cause
+          )
+        case 'VALIDATION_ERROR':
+          return new ValidationError(
+            String(obj.entityType || ''),
+            obj.zodError as z.ZodError,
+            obj.cause
+          )
+        case 'INVALID_RELATIONSHIP':
+          return new InvalidRelationshipError(
+            String(obj.entityType || ''),
+            String(obj.foreignKey || ''),
+            String(obj.referencedEntityType || ''),
+            Number(obj.referencedId || 0),
+            obj.cause
+          )
+        case 'PERSISTENCE_ERROR':
+          return new PersistenceError(
+            String(obj.entityType || ''),
+            obj.operation as 'create' | 'update' | 'delete' | 'read' | 'save',
+            obj.cause
+          )
+      }
+    }
+  }
+  return error
+}
+
+/**
  * Schema-generic Zod validation helper.
  * Validates unknown inputs against the schema, wrapping ZodError in ValidationError.
  */
@@ -206,8 +271,12 @@ export function translatePersistenceError(
   err: unknown,
   context: PersistenceErrorContext
 ): never {
-  if (isRepositoryError(err)) {
-    throw err
+  if (err && typeof err === 'object' && 'inner' in err && isRepositoryOrSerializedError(err.inner)) {
+    throw reconstructRepositoryError(err.inner)
+  }
+
+  if (isRepositoryOrSerializedError(err)) {
+    throw reconstructRepositoryError(err)
   }
 
   // Identify unique constraint collisions
