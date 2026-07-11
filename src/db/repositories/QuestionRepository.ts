@@ -417,4 +417,45 @@ export class QuestionRepository {
       })
     }
   }
+
+  async delete(id: number): Promise<void> {
+    validateSchema(positiveIdSchema, id, 'Question')
+    let repoError: unknown = null
+
+    try {
+      await this.db.transaction('rw', [this.db.questions, this.db.answerAttempts], async () => {
+        try {
+          const current = await this.db.questions.get(id)
+          if (!current) {
+            throw new NotFoundError('Question', id)
+          }
+
+          // Modify AnswerAttempts
+          await this.db.answerAttempts.where('questionId').equals(id).modify({
+            questionId: null
+          })
+
+          // Delete Question
+          await this.db.questions.delete(id)
+        } catch (err) {
+          repoError = err
+          throw err
+        }
+      })
+    } catch (err) {
+      if (repoError) {
+        throw reconstructRepositoryError(repoError)
+      }
+      if (err && typeof err === 'object' && 'inner' in err && isRepositoryOrSerializedError(err.inner)) {
+        throw reconstructRepositoryError(err.inner)
+      }
+      if (isRepositoryOrSerializedError(err)) {
+        throw reconstructRepositoryError(err)
+      }
+      translatePersistenceError(err, {
+        entityType: 'Question',
+        operation: 'delete'
+      })
+    }
+  }
 }

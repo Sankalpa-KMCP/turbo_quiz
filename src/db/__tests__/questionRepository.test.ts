@@ -686,4 +686,212 @@ describe('QuestionRepository', () => {
       }
     })
   })
+
+  describe('Deletion', () => {
+    it('should validate id and throw ValidationError for malformed ids', async () => {
+      const invalidValues = [0, -1, 1.5, NaN, Infinity, '1' as unknown as number]
+      for (const val of invalidValues) {
+        await expect(repo.delete(val)).rejects.toThrow(ValidationError)
+      }
+    })
+
+    it('should throw NotFoundError if question does not exist', async () => {
+      await expect(repo.delete(9999)).rejects.toThrow(NotFoundError)
+    })
+
+    it('should successfully delete question with no associated answer attempts', async () => {
+      const q = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Delete me',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+
+      const beforeCount = await testDb.questions.count()
+      expect(beforeCount).toBe(1)
+
+      const result = await repo.delete(q.id)
+      expect(result).toBeUndefined()
+
+      const afterCount = await testDb.questions.count()
+      expect(afterCount).toBe(0)
+      await expect(repo.getById(q.id)).resolves.toBeUndefined()
+    })
+
+    it('should delete question and nullify only matching answer attempts while preserving snapshots and other fields', async () => {
+      const qTarget = await repo.create({
+        subjectId,
+        topicId,
+        questionText: 'Target Q',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+
+      const qUnrelated = await repo.create({
+        subjectId,
+        topicId,
+        questionText: 'Unrelated Q',
+        options: ['C', 'D'],
+        correctOptionIndex: 1,
+        explanation: null,
+        difficulty: 'medium'
+      })
+
+      const quizAttemptId = await testDb.quizAttempts.add({
+        subjectId,
+        topicId,
+        mode: 'practice',
+        totalQuestions: 2,
+        correctAnswers: 1,
+        scorePercentage: 50,
+        timeTakenSeconds: 15,
+        startedAt: 1000,
+        completedAt: 1000,
+        subjectNameSnap: 'Biology',
+        topicNameSnap: 'Cells'
+      })
+
+      const attempt1Payload = {
+        quizAttemptId,
+        questionId: qTarget.id,
+        selectedOptionIndex: 0,
+        correctOptionIndex: 0,
+        isCorrect: true,
+        timeTakenSeconds: 10,
+        questionSnapshot: {
+          questionText: 'Target Q',
+          options: ['A', 'B'],
+          correctOptionIndex: 0,
+          explanation: null,
+          difficulty: 'easy' as const
+        }
+      }
+
+      const attemptUnrelatedPayload = {
+        quizAttemptId,
+        questionId: qUnrelated.id,
+        selectedOptionIndex: 1,
+        correctOptionIndex: 1,
+        isCorrect: true,
+        timeTakenSeconds: 5,
+        questionSnapshot: {
+          questionText: 'Unrelated Q',
+          options: ['C', 'D'],
+          correctOptionIndex: 1,
+          explanation: null,
+          difficulty: 'medium' as const
+        }
+      }
+
+      const attempt1Id = await testDb.answerAttempts.add(attempt1Payload)
+      const attemptUnrelatedId = await testDb.answerAttempts.add(attemptUnrelatedPayload)
+
+      // Execute Deletion
+      await repo.delete(qTarget.id)
+
+      // Question target is deleted
+      await expect(repo.getById(qTarget.id)).resolves.toBeUndefined()
+      // Unrelated question is untouched
+      await expect(repo.getById(qUnrelated.id)).resolves.toBeDefined()
+
+      // Target answer attempt is updated: questionId becomes null
+      const attempt1 = await testDb.answerAttempts.get(attempt1Id)
+      expect(attempt1).toBeDefined()
+      expect(attempt1?.questionId).toBeNull()
+      // Invariant: Snapshot remains deeply equal to original
+      expect(attempt1?.questionSnapshot).toEqual(attempt1Payload.questionSnapshot)
+      // Invariant: Other fields remain unchanged
+      expect(attempt1?.quizAttemptId).toBe(attempt1Payload.quizAttemptId)
+      expect(attempt1?.selectedOptionIndex).toBe(attempt1Payload.selectedOptionIndex)
+      expect(attempt1?.correctOptionIndex).toBe(attempt1Payload.correctOptionIndex)
+      expect(attempt1?.isCorrect).toBe(attempt1Payload.isCorrect)
+      expect(attempt1?.timeTakenSeconds).toBe(attempt1Payload.timeTakenSeconds)
+
+      // Unrelated answer attempt is untouched
+      const attemptUnrelated = await testDb.answerAttempts.get(attemptUnrelatedId)
+      expect(attemptUnrelated?.questionId).toBe(qUnrelated.id)
+      expect(attemptUnrelated?.questionSnapshot).toEqual(attemptUnrelatedPayload.questionSnapshot)
+
+      // QuizAttempt record remains untouched
+      const quizAttempt = await testDb.quizAttempts.get(quizAttemptId)
+      expect(quizAttempt).toBeDefined()
+      expect(quizAttempt?.subjectId).toBe(subjectId)
+      expect(quizAttempt?.topicId).toBe(topicId)
+      expect(quizAttempt?.subjectNameSnap).toBe('Biology')
+      expect(quizAttempt?.topicNameSnap).toBe('Cells')
+    })
+
+    it('should abort transaction and roll back all changes if deletion fails (rollback test)', async () => {
+      const q = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Test Q',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+
+      const quizAttemptId = await testDb.quizAttempts.add({
+        subjectId,
+        topicId: null,
+        mode: 'practice',
+        totalQuestions: 1,
+        correctAnswers: 1,
+        scorePercentage: 100,
+        timeTakenSeconds: 5,
+        startedAt: 1000,
+        completedAt: 1000,
+        subjectNameSnap: 'Biology',
+        topicNameSnap: null
+      })
+
+      const attemptPayload = {
+        quizAttemptId,
+        questionId: q.id,
+        selectedOptionIndex: 0,
+        correctOptionIndex: 0,
+        isCorrect: true,
+        timeTakenSeconds: 5,
+        questionSnapshot: {
+          questionText: 'Test Q',
+          options: ['A', 'B'],
+          correctOptionIndex: 0,
+          explanation: null,
+          difficulty: 'easy' as const
+        }
+      }
+
+      const attemptId = await testDb.answerAttempts.add(attemptPayload)
+
+      // Register deletion hook that throws to abort transaction
+      const failingHook = () => {
+        throw new Error('Forced transaction abort')
+      }
+      testDb.questions.hook('deleting', failingHook)
+
+      try {
+        await expect(repo.delete(q.id)).rejects.toThrow()
+      } finally {
+        // Unsubscribe the hook
+        testDb.questions.hook('deleting').unsubscribe(failingHook)
+      }
+
+      // Rollback assertion: target Question still exists
+      const questionAfter = await testDb.questions.get(q.id)
+      expect(questionAfter).toBeDefined()
+      expect(questionAfter?.questionText).toBe('Test Q')
+
+      // Rollback assertion: AnswerAttempt relationship remains intact
+      const attemptAfter = await testDb.answerAttempts.get(attemptId)
+      expect(attemptAfter).toBeDefined()
+      expect(attemptAfter?.questionId).toBe(q.id) // Still references the question!
+      expect(attemptAfter?.questionSnapshot).toEqual(attemptPayload.questionSnapshot)
+    })
+  })
 })
