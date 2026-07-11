@@ -1,19 +1,132 @@
 import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import App from './App'
 
-describe('App Smoke Test', () => {
-  it('renders TurboQuiz App header', () => {
-    render(<App />)
-    expect(screen.getByText('TurboQuiz App')).toBeInTheDocument()
+describe('App Shell and Routing', () => {
+  beforeEach(() => {
+    // Reset history state to dashboard before each test
+    window.history.pushState({}, '', '/')
   })
 
-  it('increments the count when smoke test counter button is clicked', () => {
+  it('renders the application shell and Dashboard by default', () => {
     render(<App />)
-    const button = screen.getByRole('button', { name: /Smoke Test Counter/i })
-    expect(button).toHaveTextContent('Smoke Test Counter: 0')
 
-    fireEvent.click(button)
-    expect(button).toHaveTextContent('Smoke Test Counter: 1')
+    // Check for brand logo / title in sidebar & header
+    expect(screen.getAllByText('TurboQuiz')).toHaveLength(2)
+
+    // Check if default page (Dashboard) is rendered
+    expect(screen.getByRole('heading', { name: /Dashboard/i })).toBeInTheDocument()
+    expect(
+      screen.getByText(/Welcome to TurboQuiz. This page will display your overall progress/i)
+    ).toBeInTheDocument()
+  })
+
+  it('navigates to the Subjects page when clicking the sidebar link', () => {
+    render(<App />)
+
+    const subjectsLinks = screen.getAllByRole('link', { name: /Subjects/i })
+    expect(subjectsLinks.length).toBeGreaterThan(0)
+
+    fireEvent.click(subjectsLinks[0])
+
+    expect(screen.getByRole('heading', { name: /Subjects/i })).toBeInTheDocument()
+    expect(screen.getByText(/Manage your subjects and topics/i)).toBeInTheDocument()
+  })
+
+  it('renders dynamic subject route parameters safely', () => {
+    window.history.pushState({}, '', '/subjects/math-101')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /Subject Details/i })).toBeInTheDocument()
+    expect(screen.getByText('math-101')).toBeInTheDocument()
+  })
+
+  it('renders 404 not found page for unmatched routes', () => {
+    window.history.pushState({}, '', '/some-non-existent-route')
+    render(<App />)
+
+    expect(screen.getByRole('heading', { name: /404/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Page Not Found/i })).toBeInTheDocument()
+  })
+
+  it('toggles mobile menu open and close accessibly', () => {
+    render(<App />)
+
+    const toggleBtn = screen.getByRole('button', { name: /Toggle navigation menu/i })
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+
+    fireEvent.click(toggleBtn)
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'true')
+
+    const closeBtn = screen.getByRole('button', { name: /Close navigation menu/i })
+    fireEvent.click(closeBtn)
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  // Keyboard Accessibility Tests
+  it('closes the drawer when Escape is pressed', () => {
+    render(<App />)
+    const toggleBtn = screen.getByRole('button', { name: /Toggle navigation menu/i })
+
+    // Open drawer
+    fireEvent.click(toggleBtn)
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'true')
+
+    // Press Escape
+    fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
+    expect(toggleBtn).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('moves focus into the drawer when it opens', () => {
+    render(<App />)
+    const toggleBtn = screen.getByRole('button', { name: /Toggle navigation menu/i })
+
+    fireEvent.click(toggleBtn)
+
+    // First focusable element should be the Close menu button
+    const closeBtn = screen.getByRole('button', { name: /Close navigation menu/i })
+    expect(document.activeElement).toBe(closeBtn)
+  })
+
+  it('restores focus to the toggle button when the drawer closes', () => {
+    render(<App />)
+    const toggleBtn = screen.getByRole('button', { name: /Toggle navigation menu/i })
+
+    // Focus and click
+    toggleBtn.focus()
+    expect(document.activeElement).toBe(toggleBtn)
+    fireEvent.click(toggleBtn)
+
+    const closeBtn = screen.getByRole('button', { name: /Close navigation menu/i })
+    fireEvent.click(closeBtn)
+
+    // Focus restored
+    expect(document.activeElement).toBe(toggleBtn)
+  })
+
+  it('wraps focus from last to first element on Tab, and first to last on Shift+Tab', () => {
+    render(<App />)
+    const toggleBtn = screen.getByRole('button', { name: /Toggle navigation menu/i })
+
+    fireEvent.click(toggleBtn)
+
+    const drawer = document.getElementById('mobile-drawer')
+    expect(drawer).toBeInTheDocument()
+
+    const focusable = drawer!.querySelectorAll('a, button')
+    const first = focusable[0] as HTMLElement
+    const last = focusable[focusable.length - 1] as HTMLElement
+
+    // Tab wrapping (Forward)
+    last.focus()
+    expect(document.activeElement).toBe(last)
+    fireEvent.keyDown(window, { key: 'Tab', code: 'Tab' })
+    expect(document.activeElement).toBe(first)
+
+    // Shift+Tab wrapping (Reverse)
+    first.focus()
+    expect(document.activeElement).toBe(first)
+    fireEvent.keyDown(window, { key: 'Tab', code: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(last)
   })
 })
