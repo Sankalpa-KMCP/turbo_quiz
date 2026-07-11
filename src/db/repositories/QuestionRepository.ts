@@ -3,9 +3,12 @@ import { type QuizDatabase } from '../database'
 import {
   type Question,
   type QuestionInput,
-  type QuestionUpdateInput
+  type QuestionUpdateInput,
+  type Difficulty,
+  type BookmarkStatus
 } from '../../types/db'
 import { questionCreateSchema, questionUpdateSchema } from '../../schemas/questionSchema'
+import { normalizeName } from '../../utils/normalizeName'
 import {
   validateSchema,
   translatePersistenceError,
@@ -15,6 +18,47 @@ import {
   isRepositoryOrSerializedError,
   reconstructRepositoryError
 } from '../errors'
+
+export type TopicFilter =
+  | { kind: 'all' }
+  | { kind: 'topic'; topicId: number }
+  | { kind: 'uncategorized' }
+
+export interface QuestionSearchFilter {
+  subjectId: number
+  topicFilter?: TopicFilter
+  difficulty?: Difficulty
+  bookmarkStatus?: BookmarkStatus
+  searchText?: string
+}
+
+const topicFilterSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('all') }).strict(),
+  z.object({ kind: z.literal('uncategorized') }).strict(),
+  z.object({
+    kind: z.literal('topic'),
+    topicId: z.number().int().positive('topicId must be a positive integer')
+  }).strict()
+])
+
+const questionSearchFilterSchema = z.object({
+  subjectId: z.number().int().positive('subjectId must be a positive integer'),
+  topicFilter: topicFilterSchema.optional(),
+  difficulty: z.enum(['easy', 'medium', 'hard']).optional(),
+  bookmarkStatus: z.union([z.literal(0), z.literal(1)]).optional(),
+  searchText: z.preprocess(
+    (val) => {
+      if (typeof val === 'string') {
+        const trimmed = val.trim()
+        return trimmed === '' ? undefined : trimmed
+      }
+      return val
+    },
+    z.string().optional()
+  )
+}).strict()
+
+const positiveIdSchema = z.number().int().positive('Id must be a positive integer')
 
 export class QuestionRepository {
   private readonly db: QuizDatabase
@@ -289,6 +333,87 @@ export class QuestionRepository {
       translatePersistenceError(err, {
         entityType: 'Question',
         operation: 'update'
+      })
+    }
+  }
+
+  async search(filter: QuestionSearchFilter): Promise<Question[]> {
+    const validated = validateSchema(questionSearchFilterSchema, filter, 'Question')
+
+    const subjectId = validated.subjectId
+    const topicFilter = validated.topicFilter ?? { kind: 'all' }
+
+    let questions: Question[] = []
+
+    try {
+      if (topicFilter.kind === 'all') {
+        questions = await this.db.questions.where('subjectId').equals(subjectId).toArray()
+      } else if (topicFilter.kind === 'topic') {
+        questions = await this.db.questions.where('[subjectId+topicId]').equals([subjectId, topicFilter.topicId]).toArray()
+      } else {
+        questions = await this.db.questions.where('subjectId').equals(subjectId).toArray()
+      }
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'Question',
+        operation: 'read'
+      })
+    }
+
+    let results = questions
+
+    if (topicFilter.kind === 'uncategorized') {
+      results = results.filter((q) => q.topicId === null)
+    }
+
+    if (validated.difficulty !== undefined) {
+      results = results.filter((q) => q.difficulty === validated.difficulty)
+    }
+
+    if (validated.bookmarkStatus !== undefined) {
+      results = results.filter((q) => q.bookmarkStatus === validated.bookmarkStatus)
+    }
+
+    if (validated.searchText !== undefined) {
+      const queryStr = normalizeName(validated.searchText)
+      results = results.filter((q) => {
+        const textMatch = normalizeName(q.questionText).includes(queryStr)
+        const optionsMatch = q.options.some((opt) => normalizeName(opt).includes(queryStr))
+        const explanationMatch = q.explanation !== null && normalizeName(q.explanation).includes(queryStr)
+        return textMatch || optionsMatch || explanationMatch
+      })
+    }
+
+    results.sort((a, b) => {
+      if (b.createdAt !== a.createdAt) {
+        return b.createdAt - a.createdAt
+      }
+      return b.id - a.id
+    })
+
+    return results
+  }
+
+  async countBySubject(subjectId: number): Promise<number> {
+    validateSchema(positiveIdSchema, subjectId, 'Question')
+    try {
+      return await this.db.questions.where('subjectId').equals(subjectId).count()
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'Question',
+        operation: 'read'
+      })
+    }
+  }
+
+  async countByTopic(topicId: number): Promise<number> {
+    validateSchema(positiveIdSchema, topicId, 'Question')
+    try {
+      return await this.db.questions.where('topicId').equals(topicId).count()
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'Question',
+        operation: 'read'
       })
     }
   }

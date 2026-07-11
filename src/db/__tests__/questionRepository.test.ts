@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createDatabase, type QuizDatabase } from '../database'
-import { QuestionRepository } from '../repositories/QuestionRepository'
+import { QuestionRepository, type TopicFilter, type QuestionSearchFilter } from '../repositories/QuestionRepository'
 import {
   ValidationError,
   NotFoundError,
   InvalidRelationshipError
 } from '../errors'
-import { type QuestionUpdateInput } from '../../types/db'
+import { type QuestionUpdateInput, type Question, type Difficulty, type BookmarkStatus } from '../../types/db'
 
 describe('QuestionRepository', () => {
   let testDb: QuizDatabase
@@ -433,6 +433,257 @@ describe('QuestionRepository', () => {
       expect(t2.updatedAt).toBe(3000)
 
       await expect(repo.toggleBookmark(created.id + 999)).rejects.toThrow(NotFoundError)
+    })
+  })
+
+  describe('Search', () => {
+    let otherSubjectId: number
+    let otherTopicId: number
+    let q1: Question
+    let q2: Question
+    let q3: Question
+    let q4: Question
+
+    beforeEach(async () => {
+      otherSubjectId = await testDb.subjects.add({
+        name: 'Chemistry',
+        normalizedName: 'chemistry',
+        description: null,
+        createdAt: 1000,
+        updatedAt: 1000
+      })
+
+      otherTopicId = await testDb.topics.add({
+        subjectId: otherSubjectId,
+        name: 'Organic',
+        normalizedName: 'organic',
+        createdAt: 1000
+      })
+
+      clockTime = 1000
+      q1 = await repo.create({
+        subjectId,
+        topicId,
+        questionText: 'What is Cell membrane?',
+        options: ['lipid bilayer', 'protein channel'],
+        correctOptionIndex: 0,
+        explanation: 'Membrane structure explanation',
+        difficulty: 'easy',
+        bookmarkStatus: 1
+      })
+
+      clockTime = 1100
+      q2 = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Define genetics and DNA.',
+        options: ['Gene info', 'Nucleotides'],
+        correctOptionIndex: 1,
+        explanation: null,
+        difficulty: 'medium',
+        bookmarkStatus: 0
+      })
+
+      clockTime = 900
+      q3 = await repo.create({
+        subjectId,
+        topicId,
+        questionText: 'Mitochondria function?',
+        options: ['Powerhouse of cells', 'Protein factory'],
+        correctOptionIndex: 0,
+        explanation: 'Mitochondria description',
+        difficulty: 'hard',
+        bookmarkStatus: 1
+      })
+
+      clockTime = 1200
+      q4 = await repo.create({
+        subjectId: otherSubjectId,
+        topicId: otherTopicId,
+        questionText: 'Organic molecule structure?',
+        options: ['Carbon-based', 'Silicate-based'],
+        correctOptionIndex: 0,
+        explanation: 'Organic compounds chemistry',
+        difficulty: 'easy',
+        bookmarkStatus: 1
+      })
+    })
+
+    it('should return all questions for a subject when topicFilter is omitted or set to all', async () => {
+      const res1 = await repo.search({ subjectId })
+      expect(res1.map(q => q.id)).toEqual([q2.id, q1.id, q3.id])
+      expect(res1.map(q => q.id)).not.toContain(q4.id)
+
+      const res2 = await repo.search({ subjectId, topicFilter: { kind: 'all' } })
+      expect(res2.map(q => q.id)).toEqual([q2.id, q1.id, q3.id])
+      expect(res2.map(q => q.id)).not.toContain(q4.id)
+    })
+
+    it('should filter by specific topic and exclude other topics', async () => {
+      const res = await repo.search({ subjectId, topicFilter: { kind: 'topic', topicId } })
+      expect(res.map(q => q.id)).toEqual([q1.id, q3.id])
+    })
+
+    it('should filter uncategorized questions only', async () => {
+      const res = await repo.search({ subjectId, topicFilter: { kind: 'uncategorized' } })
+      expect(res.map(q => q.id)).toEqual([q2.id])
+    })
+
+    it('should return empty results for nonexistent subject or topic combinations', async () => {
+      const res1 = await repo.search({ subjectId: subjectId + 999 })
+      expect(res1).toEqual([])
+
+      const res2 = await repo.search({ subjectId, topicFilter: { kind: 'topic', topicId: topicId + 999 } })
+      expect(res2).toEqual([])
+    })
+
+    it('should throw ValidationError for malformed search parameters', async () => {
+      await expect(repo.search({ subjectId: 0 })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId: -5 })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId: 1.5 })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId: NaN })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId: Infinity })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId: '1' as unknown as number })).rejects.toThrow(ValidationError)
+
+      await expect(repo.search({ subjectId, topicFilter: { kind: 'topic', topicId: -1 } })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId, topicFilter: { kind: 'topic', topicId: NaN } })).rejects.toThrow(ValidationError)
+
+      await expect(repo.search({ subjectId, topicFilter: { kind: 'all', topicId } as unknown as TopicFilter })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId, topicFilter: { kind: 'uncategorized', topicId } as unknown as TopicFilter })).rejects.toThrow(ValidationError)
+
+      await expect(repo.search({ subjectId, topicFilter: { kind: 'unknown' } as unknown as TopicFilter })).rejects.toThrow(ValidationError)
+
+      await expect(repo.search({ subjectId, difficulty: 'super-hard' as unknown as Difficulty })).rejects.toThrow(ValidationError)
+      await expect(repo.search({ subjectId, bookmarkStatus: 2 as unknown as BookmarkStatus })).rejects.toThrow(ValidationError)
+
+      await expect(repo.search({ subjectId, extraField: 'test' } as unknown as QuestionSearchFilter)).rejects.toThrow(ValidationError)
+    })
+
+    it('should filter by difficulty using exact match', async () => {
+      const res = await repo.search({ subjectId, difficulty: 'easy' })
+      expect(res.map(q => q.id)).toEqual([q1.id])
+    })
+
+    it('should filter by bookmarkStatus correctly including status 0', async () => {
+      const res1 = await repo.search({ subjectId, bookmarkStatus: 1 })
+      expect(res1.map(q => q.id)).toEqual([q1.id, q3.id])
+
+      const res0 = await repo.search({ subjectId, bookmarkStatus: 0 })
+      expect(res0.map(q => q.id)).toEqual([q2.id])
+    })
+
+    it('should match search text case-insensitively, trimmed, and unicode normalized', async () => {
+      const r1 = await repo.search({ subjectId, searchText: '  membrane  ' })
+      expect(r1.map(q => q.id)).toEqual([q1.id])
+
+      const r2 = await repo.search({ subjectId, searchText: 'LIPID' })
+      expect(r2.map(q => q.id)).toEqual([q1.id])
+
+      const r3 = await repo.search({ subjectId, searchText: 'explanation' })
+      expect(r3.map(q => q.id)).toEqual([q1.id])
+
+      const r4 = await repo.search({ subjectId, searchText: 'DNA' })
+      expect(r4.map(q => q.id)).toEqual([q2.id])
+
+      const r5 = await repo.search({ subjectId, searchText: '   ' })
+      expect(r5.map(q => q.id)).toEqual([q2.id, q1.id, q3.id])
+
+      const cafeCombined = 'cafe\u0301'
+      const qCafe = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Question about café',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+      const r6 = await repo.search({ subjectId, searchText: cafeCombined })
+      expect(r6.map(q => q.id)).toContain(qCafe.id)
+    })
+
+    it('should combine multiple filters using AND semantics', async () => {
+      const res = await repo.search({
+        subjectId,
+        topicFilter: { kind: 'topic', topicId },
+        difficulty: 'easy',
+        bookmarkStatus: 1,
+        searchText: 'membrane'
+      })
+      expect(res.map(q => q.id)).toEqual([q1.id])
+    })
+
+    it('should sort results by createdAt DESC and id DESC tie-breaker', async () => {
+      clockTime = 2000
+      const qa = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Question A',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+      const qb = await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Question B',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+
+      const res = await repo.search({ subjectId, difficulty: 'easy' })
+      expect(res.map(q => q.id)).toEqual([qb.id, qa.id, q1.id])
+    })
+  })
+
+  describe('Counts', () => {
+    beforeEach(async () => {
+      await repo.create({
+        subjectId,
+        topicId,
+        questionText: 'Q1',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'easy'
+      })
+
+      await repo.create({
+        subjectId,
+        topicId: null,
+        questionText: 'Q2',
+        options: ['A', 'B'],
+        correctOptionIndex: 0,
+        explanation: null,
+        difficulty: 'medium'
+      })
+    })
+
+    it('should return correct counts by subject including categorized and uncategorized', async () => {
+      const count = await repo.countBySubject(subjectId)
+      expect(count).toBe(2)
+
+      const countZero = await repo.countBySubject(subjectId + 999)
+      expect(countZero).toBe(0)
+    })
+
+    it('should return correct counts by topic and exclude uncategorized', async () => {
+      const count = await repo.countByTopic(topicId)
+      expect(count).toBe(1)
+
+      const countZero = await repo.countByTopic(topicId + 999)
+      expect(countZero).toBe(0)
+    })
+
+    it('should throw ValidationError for invalid identifier arguments', async () => {
+      const invalidValues = [0, -1, 1.5, NaN, Infinity, '1' as unknown as number]
+      for (const val of invalidValues) {
+        await expect(repo.countBySubject(val)).rejects.toThrow(ValidationError)
+        await expect(repo.countByTopic(val)).rejects.toThrow(ValidationError)
+      }
     })
   })
 })
