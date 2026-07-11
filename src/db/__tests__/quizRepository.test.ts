@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { createDatabase, type QuizDatabase } from '../database'
 import { QuizRepository } from '../repositories/QuizRepository'
-import { ValidationError } from '../errors'
+import { ValidationError, NotFoundError } from '../errors'
 import { type QuizAttemptSessionSaveInput } from '../../types/db'
+import { SubjectRepository } from '../repositories/SubjectRepository'
+import { QuestionRepository } from '../repositories/QuestionRepository'
 
 describe('QuizRepository', () => {
   let testDb: QuizDatabase
   let repo: QuizRepository
+  let subjectRepo: SubjectRepository
+  let questionRepo: QuestionRepository
   let clockTime: number
   let subjectId: number
   let topicId: number
@@ -19,6 +23,8 @@ describe('QuizRepository', () => {
     await testDb.open()
     clockTime = 2000
     repo = new QuizRepository(testDb, () => clockTime)
+    subjectRepo = new SubjectRepository(testDb, () => clockTime)
+    questionRepo = new QuestionRepository(testDb, () => clockTime)
 
     // Setup prerequisite records
     subjectId = await testDb.subjects.add({
@@ -611,6 +617,309 @@ describe('QuizRepository', () => {
 
       expect(normalSaveAttempt.id).toBeTypeOf('number')
       expect(await testDb.quizAttempts.count()).toBe(baselineAttemptsCount + 1)
+    })
+  })
+
+  describe('Read Path and Queries', () => {
+    let attemptId: number
+
+    beforeEach(async () => {
+      // Create a base quiz attempt to use across read tests
+      const input: QuizAttemptSessionSaveInput = {
+        subjectId,
+        topicId,
+        subjectNameSnap: 'Biology',
+        topicNameSnap: 'Cells',
+        mode: 'practice',
+        startedAt: 1000,
+        answers: [
+          {
+            questionId: question1Id,
+            selectedOptionIndex: 0,
+            timeTakenSeconds: 10,
+            questionSnapshot: {
+              questionText: 'What is mitochondria?',
+              options: ['Powerhouse', 'Control center'],
+              correctOptionIndex: 0,
+              explanation: 'Mitochondria is powerhouse',
+              difficulty: 'easy'
+            }
+          },
+          {
+            questionId: question2Id,
+            selectedOptionIndex: 1,
+            timeTakenSeconds: 15,
+            questionSnapshot: {
+              questionText: 'What is nucleus?',
+              options: ['Cell brain', 'Storage'],
+              correctOptionIndex: 0,
+              explanation: 'Nucleus controls cells',
+              difficulty: 'easy'
+            }
+          }
+        ]
+      }
+      const attempt = await repo.save(input)
+      attemptId = attempt.id
+    })
+
+    describe('Lookups by ID', () => {
+      it('should return stored QuizAttempt for an existing ID', async () => {
+        const attempt = await repo.getAttemptById(attemptId)
+        expect(attempt).toBeDefined()
+        expect(attempt?.id).toBe(attemptId)
+        expect(attempt?.subjectNameSnap).toBe('Biology')
+      })
+
+      it('should return undefined for a valid nonexistent ID', async () => {
+        const attempt = await repo.getAttemptById(99999)
+        expect(attempt).toBeUndefined()
+      })
+
+      it('should return stored QuizAttempt on requireAttemptById for an existing ID', async () => {
+        const attempt = await repo.requireAttemptById(attemptId)
+        expect(attempt.id).toBe(attemptId)
+        expect(attempt.subjectNameSnap).toBe('Biology')
+      })
+
+      it('should throw NotFoundError on requireAttemptById for a valid nonexistent ID', async () => {
+        await expect(repo.requireAttemptById(99999)).rejects.toThrow(NotFoundError)
+      })
+
+      const malformedIds = [
+        0,
+        -1,
+        2.5,
+        NaN,
+        Infinity,
+        -Infinity,
+        'string',
+        null,
+        undefined
+      ]
+
+      it.each(malformedIds)('should throw ValidationError for malformed ID: %s', async (invalidId) => {
+        await expect(repo.getAttemptById(invalidId as unknown as number)).rejects.toThrow(ValidationError)
+        await expect(repo.requireAttemptById(invalidId as unknown as number)).rejects.toThrow(ValidationError)
+      })
+    })
+
+    describe('Answer Retrieval', () => {
+      it('should return AnswerAttempts sorted by ID ascending', async () => {
+        const answers = await repo.getAnswersForAttempt(attemptId)
+        expect(answers).toHaveLength(2)
+        expect(answers[0].id).toBeLessThan(answers[1].id)
+        expect(answers[0].questionSnapshot.questionText).toBe('What is mitochondria?')
+        expect(answers[1].questionSnapshot.questionText).toBe('What is nucleus?')
+      })
+
+      it('should return empty list for valid nonexistent parent ID', async () => {
+        const answers = await repo.getAnswersForAttempt(99999)
+        expect(answers).toEqual([])
+      })
+
+      it('should return empty list for existing attempt with no AnswerAttempts', async () => {
+        const noAnswersAttemptId = await testDb.quizAttempts.add({
+          subjectId,
+          topicId: null,
+          mode: 'practice',
+          totalQuestions: 0,
+          correctAnswers: 0,
+          scorePercentage: 0,
+          timeTakenSeconds: 0,
+          startedAt: 1000,
+          completedAt: 2000,
+          subjectNameSnap: 'Biology',
+          topicNameSnap: null
+        })
+
+        const answers = await repo.getAnswersForAttempt(noAnswersAttemptId)
+        expect(answers).toEqual([])
+      })
+
+      it('should remain readable and preserve snapshots after current Question edits or deletion', async () => {
+        // Edit current question and delete another
+        await testDb.questions.update(question1Id, {
+          questionText: 'Edited Question Text'
+        })
+        await questionRepo.delete(question2Id)
+
+        const answers = await repo.getAnswersForAttempt(attemptId)
+        expect(answers).toHaveLength(2)
+
+        // Snapshot is preserved (Option A / session-start snapshot is authoritative)
+        expect(answers[0].questionSnapshot.questionText).toBe('What is mitochondria?')
+        expect(answers[0].questionId).toBe(question1Id) // ID retained
+
+        expect(answers[1].questionSnapshot.questionText).toBe('What is nucleus?')
+        expect(answers[1].questionId).toBeNull() // ID nullified
+      })
+    })
+
+    describe('Listing All Attempts', () => {
+      it('should return empty array when no attempts exist', async () => {
+        // Clear all attempts
+        await testDb.quizAttempts.clear()
+        const attempts = await repo.getAllAttempts()
+        expect(attempts).toEqual([])
+      })
+
+      it('should return attempts sorted by completedAt descending and then ID descending', async () => {
+        // Clear the beforeEach attempt to simplify sorting checks
+        await testDb.quizAttempts.clear()
+
+        // Insert attempts out of chronological order
+        const id1 = await testDb.quizAttempts.add({
+          subjectId,
+          topicId: null,
+          mode: 'practice',
+          totalQuestions: 1,
+          correctAnswers: 1,
+          scorePercentage: 100,
+          timeTakenSeconds: 10,
+          startedAt: 1000,
+          completedAt: 3000, // completed last
+          subjectNameSnap: 'Subject 1',
+          topicNameSnap: null
+        })
+
+        const id2 = await testDb.quizAttempts.add({
+          subjectId,
+          topicId: null,
+          mode: 'practice',
+          totalQuestions: 1,
+          correctAnswers: 1,
+          scorePercentage: 100,
+          timeTakenSeconds: 10,
+          startedAt: 1000,
+          completedAt: 1000, // completed first
+          subjectNameSnap: 'Subject 2',
+          topicNameSnap: null
+        })
+
+        // Tie-breaker candidates (same completedAt)
+        const id3 = await testDb.quizAttempts.add({
+          subjectId,
+          topicId: null,
+          mode: 'practice',
+          totalQuestions: 1,
+          correctAnswers: 1,
+          scorePercentage: 100,
+          timeTakenSeconds: 10,
+          startedAt: 1000,
+          completedAt: 2000, // tie completedAt
+          subjectNameSnap: 'Subject 3 (Tie 1)',
+          topicNameSnap: null
+        })
+
+        const id4 = await testDb.quizAttempts.add({
+          subjectId,
+          topicId: null,
+          mode: 'practice',
+          totalQuestions: 1,
+          correctAnswers: 1,
+          scorePercentage: 100,
+          timeTakenSeconds: 10,
+          startedAt: 1000,
+          completedAt: 2000, // tie completedAt, higher ID
+          subjectNameSnap: 'Subject 4 (Tie 2)',
+          topicNameSnap: null
+        })
+
+        const list = await repo.getAllAttempts()
+        expect(list).toHaveLength(4)
+
+        // Expected sorted order: completedAt desc, then ID desc
+        // 1. completedAt = 3000 -> id1
+        // 2. completedAt = 2000, ID = id4 (since id4 > id3) -> id4
+        // 3. completedAt = 2000, ID = id3 -> id3
+        // 4. completedAt = 1000 -> id2
+        expect(list[0].id).toBe(id1)
+        expect(list[1].id).toBe(id4)
+        expect(list[2].id).toBe(id3)
+        expect(list[3].id).toBe(id2)
+      })
+
+      it('should include attempts with null Subject/Topic relationships', async () => {
+        await subjectRepo.delete(subjectId) // Cascades to nullify relationships
+
+        const list = await repo.getAllAttempts()
+        expect(list).toHaveLength(1)
+        expect(list[0].subjectId).toBeNull()
+        expect(list[0].topicId).toBeNull()
+        expect(list[0].subjectNameSnap).toBe('Biology')
+        expect(list[0].topicNameSnap).toBe('Cells')
+      })
+    })
+
+    describe('Subject Filtering', () => {
+      it('should filter attempts by current Subject ID', async () => {
+        const list = await repo.getAttemptsBySubject(subjectId)
+        expect(list).toHaveLength(1)
+        expect(list[0].id).toBe(attemptId)
+        expect(list[0].subjectId).toBe(subjectId)
+      })
+
+      it('should exclude attempts belonging to another Subject', async () => {
+        const otherSubjectId = await testDb.subjects.add({
+          name: 'Chemistry',
+          normalizedName: 'chemistry',
+          description: null,
+          createdAt: 1000,
+          updatedAt: 1000
+        })
+
+        const list = await repo.getAttemptsBySubject(otherSubjectId)
+        expect(list).toEqual([])
+      })
+
+      it('should return empty list for valid nonexistent Subject ID', async () => {
+        const list = await repo.getAttemptsBySubject(99999)
+        expect(list).toEqual([])
+      })
+
+      it('should throw ValidationError for malformed Subject ID', async () => {
+        await expect(repo.getAttemptsBySubject(-5)).rejects.toThrow(ValidationError)
+        await expect(repo.getAttemptsBySubject(NaN)).rejects.toThrow(ValidationError)
+      })
+
+      it('should exclude attempts whose Subject relationship has been nullified', async () => {
+        // Delete the Subject (which cascades to nullify attempt subjectId)
+        await subjectRepo.delete(subjectId)
+
+        const list = await repo.getAttemptsBySubject(subjectId)
+        expect(list).toEqual([]) // Excluded
+
+        const generalHistory = await repo.getAllAttempts()
+        expect(generalHistory).toHaveLength(1) // Still visible in general history
+        expect(generalHistory[0].subjectNameSnap).toBe('Biology')
+      })
+    })
+
+    describe('Structured-Clone Isolation', () => {
+      it('should prevent returned object mutations from persisting back to database', async () => {
+        const attempt = await repo.requireAttemptById(attemptId)
+        expect(attempt.subjectNameSnap).toBe('Biology')
+
+        // Mutate return value in-memory
+        attempt.subjectNameSnap = 'MUTATED'
+
+        // Query again
+        const fresh = await repo.requireAttemptById(attemptId)
+        expect(fresh.subjectNameSnap).toBe('Biology') // Unchanged
+      })
+
+      it('should prevent returned answer mutations from persisting back to database', async () => {
+        const answers = await repo.getAnswersForAttempt(attemptId)
+        expect(answers[0].questionSnapshot.questionText).toBe('What is mitochondria?')
+
+        // Mutate return value in-memory
+        answers[0].questionSnapshot.questionText = 'MUTATED'
+
+        // Query again
+        const fresh = await repo.getAnswersForAttempt(attemptId)
+        expect(fresh[0].questionSnapshot.questionText).toBe('What is mitochondria?') // Unchanged
+      })
     })
   })
 })

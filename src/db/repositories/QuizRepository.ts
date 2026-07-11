@@ -1,6 +1,7 @@
 import { type QuizDatabase } from '../database'
 import {
   type QuizAttempt,
+  type AnswerAttempt,
   type QuizAttemptSessionSaveInput
 } from '../../types/db'
 import { quizAttemptSessionSaveSchema } from '../../schemas/quizAttemptSchema'
@@ -8,8 +9,12 @@ import {
   validateSchema,
   translatePersistenceError,
   reconstructRepositoryError,
-  isRepositoryOrSerializedError
+  isRepositoryOrSerializedError,
+  NotFoundError
 } from '../errors'
+import { z } from 'zod'
+
+const positiveIdSchema = z.number().int().positive('Id must be a positive integer')
 
 export class QuizRepository {
   private readonly db: QuizDatabase
@@ -135,6 +140,80 @@ export class QuizRepository {
       translatePersistenceError(err, {
         entityType: 'QuizAttempt',
         operation: 'save'
+      })
+    }
+  }
+
+  async getAttemptById(id: number): Promise<QuizAttempt | undefined> {
+    validateSchema(positiveIdSchema, id, 'QuizAttempt')
+    try {
+      return await this.db.quizAttempts.get(id)
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'QuizAttempt',
+        operation: 'read'
+      })
+    }
+  }
+
+  async requireAttemptById(id: number): Promise<QuizAttempt> {
+    const attempt = await this.getAttemptById(id)
+    if (!attempt) {
+      throw new NotFoundError('QuizAttempt', id)
+    }
+    return attempt
+  }
+
+  async getAnswersForAttempt(quizAttemptId: number): Promise<AnswerAttempt[]> {
+    validateSchema(positiveIdSchema, quizAttemptId, 'QuizAttempt')
+    try {
+      const answers = await this.db.answerAttempts
+        .where('quizAttemptId')
+        .equals(quizAttemptId)
+        .toArray()
+      return answers.sort((a, b) => a.id - b.id)
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'QuizAttempt',
+        operation: 'read'
+      })
+    }
+  }
+
+  async getAllAttempts(): Promise<QuizAttempt[]> {
+    try {
+      const attempts = await this.db.quizAttempts.toArray()
+      return attempts.sort((a, b) => {
+        if (b.completedAt !== a.completedAt) {
+          return b.completedAt - a.completedAt
+        }
+        return b.id - a.id
+      })
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'QuizAttempt',
+        operation: 'read'
+      })
+    }
+  }
+
+  async getAttemptsBySubject(subjectId: number): Promise<QuizAttempt[]> {
+    validateSchema(positiveIdSchema, subjectId, 'QuizAttempt')
+    try {
+      const attempts = await this.db.quizAttempts
+        .where('subjectId')
+        .equals(subjectId)
+        .toArray()
+      return attempts.sort((a, b) => {
+        if (b.completedAt !== a.completedAt) {
+          return b.completedAt - a.completedAt
+        }
+        return b.id - a.id
+      })
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'QuizAttempt',
+        operation: 'read'
       })
     }
   }
