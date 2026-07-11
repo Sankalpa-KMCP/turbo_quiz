@@ -114,3 +114,20 @@ export interface AnswerAttempt {
 
 export type QuizAttemptInput = Omit<QuizAttempt, 'id'>
 export type AnswerAttemptInput = Omit<AnswerAttempt, 'id'>
+
+export interface AnswerAttemptSessionInput {
+  questionId: number
+  selectedOptionIndex: number | null
+  timeTakenSeconds: number
+  questionSnapshot: QuestionSnapshot
+}
+
+export interface QuizAttemptSessionSaveInput {
+  subjectId: number
+  topicId: number | null
+  subjectNameSnap: string
+  topicNameSnap: string | null
+  mode: QuizMode
+  startedAt: number
+  answers: AnswerAttemptSessionInput[]
+}
