@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, beforeEach } from 'vitest'
 import App from './App'
 
@@ -30,15 +30,16 @@ describe('App Shell and Routing', () => {
     fireEvent.click(subjectsLinks[0])
 
     expect(screen.getByRole('heading', { name: /Subjects/i })).toBeInTheDocument()
-    expect(screen.getByText(/Manage your subjects and topics/i)).toBeInTheDocument()
+    expect(screen.getByText(/Manage the subjects you want to practice/i)).toBeInTheDocument()
   })
 
-  it('renders dynamic subject route parameters safely', () => {
+  it('renders dynamic subject route parameters safely', async () => {
     window.history.pushState({}, '', '/subjects/math-101')
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /Subject Details/i })).toBeInTheDocument()
-    expect(screen.getByText('math-101')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Invalid Subject ID/i })).toBeInTheDocument()
+    })
   })
 
   it('redirects /quiz/play without an active session to /quiz/setup', () => {
