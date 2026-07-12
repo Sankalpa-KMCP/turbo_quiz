@@ -41,6 +41,18 @@ describe('App Shell and Routing', () => {
     expect(screen.getByText('math-101')).toBeInTheDocument()
   })
 
+  it('redirects /quiz/play without an active session to /quiz/setup', () => {
+    window.history.pushState({}, '', '/quiz/play')
+    render(<App />)
+    expect(screen.getByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
+  })
+
+  it('redirects legacy /quiz/results without attemptId to /quiz/setup', () => {
+    window.history.pushState({}, '', '/quiz/results')
+    render(<App />)
+    expect(screen.getByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
+  })
+
   it('renders 404 not found page for unmatched routes', () => {
     window.history.pushState({}, '', '/some-non-existent-route')
     render(<App />)
