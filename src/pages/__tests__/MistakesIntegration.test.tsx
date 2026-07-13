@@ -105,7 +105,7 @@ describe('Mistakes Integration', () => {
     const sessionQuestions1 = useQuizSessionStore.getState().questions
     const q1Text = sessionQuestions1[0].questionSnapshot.questionText
     const q1IncorrectOption = sessionQuestions1[0].questionSnapshot.options[(sessionQuestions1[0].questionSnapshot.correctOptionIndex + 1) % 4]
-    
+
     // Answer Q1 incorrectly
     await waitFor(() => expect(screen.getByText(q1Text)).toBeInTheDocument())
     fireEvent.click(screen.getByText(q1IncorrectOption))
@@ -113,16 +113,16 @@ describe('Mistakes Integration', () => {
 
     const q2Text = sessionQuestions1[1].questionSnapshot.questionText
     const q2CorrectOption = sessionQuestions1[1].questionSnapshot.options[sessionQuestions1[1].questionSnapshot.correctOptionIndex]
-    
+
     // Answer Q2 correctly
     await waitFor(() => expect(screen.getByText(q2Text)).toBeInTheDocument())
     fireEvent.click(screen.getByText(q2CorrectOption))
-    
+
     // Finish Quiz
     fireEvent.click(screen.getByRole('button', { name: /Finish Quiz/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /Submit Answers/i })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: /Submit Answers/i }))
-    
+
     await waitFor(() => expect(useQuizSessionStore.getState().phase).toBe('completed'))
     await waitFor(() => expect(router.state.location.pathname).toMatch(/\/quiz\/results\/.+/))
     await waitFor(() => expect(screen.getByText('Quiz Results')).toBeInTheDocument())
@@ -160,7 +160,7 @@ describe('Mistakes Integration', () => {
     fireEvent.click(screen.getByRole('button', { name: /Finish Quiz/i }))
     await waitFor(() => expect(screen.getByRole('button', { name: /Submit Answers/i })).toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: /Submit Answers/i }))
-    
+
     await waitFor(() => expect(useQuizSessionStore.getState().phase).toBe('completed'))
     await waitFor(() => expect(router.state.location.pathname).toMatch(/\/quiz\/results\/.+/))
 

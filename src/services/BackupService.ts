@@ -42,7 +42,7 @@ export class BackupService {
     try {
       const parsed = JSON.parse(jsonString)
       const validated = backupV1Schema.parse(parsed)
-      // backupV1Schema infers a slightly different internal type due to Zod, 
+      // backupV1Schema infers a slightly different internal type due to Zod,
       // but it aligns with BackupDataV1 structurally.
       return validated as BackupDataV1
     } catch (err) {

@@ -45,7 +45,7 @@ describe('QuestionRepository.getByIds', () => {
     })
 
     const results = await questionRepo.getByIds([q1.id, 9999, q2.id])
-    
+
     expect(results).toHaveLength(2)
     expect(results.map(r => r.id)).toEqual(expect.arrayContaining([q1.id, q2.id]))
   })

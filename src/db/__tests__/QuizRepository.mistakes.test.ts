@@ -44,7 +44,7 @@ describe('QuizRepository.getMistakeProjections', () => {
       subjectId, topicId, questionText: 'Q2', options: ['A', 'B'], correctOptionIndex: 0, difficulty: 'medium', explanation: 'e'
     })
     q2Id = q2.id
-    
+
     const q3 = await questionRepo.create({
       subjectId, topicId, questionText: 'Q3', options: ['A', 'B'], correctOptionIndex: 0, difficulty: 'hard', explanation: 'e'
     })
@@ -99,7 +99,7 @@ describe('QuizRepository.getMistakeProjections', () => {
   it('excludes resolved questions where latest is correct', async () => {
     // Attempt 1: Q1 wrong
     await createAttempt(1000, [{ questionId: q1Id, isCorrect: false }])
-    
+
     let projections = await quizRepo.getMistakeProjections()
     expect(projections).toHaveLength(1)
 
@@ -121,7 +121,7 @@ describe('QuizRepository.getMistakeProjections', () => {
 
   it('treats deleted questions as deleted-history', async () => {
     await createAttempt(1000, [{ questionId: q1Id, isCorrect: false }])
-    
+
     await db.transaction('rw', db.questions, db.answerAttempts, async () => {
       await db.questions.delete(q1Id)
       // Subject delete trigger normally does this
@@ -138,13 +138,13 @@ describe('QuizRepository.getMistakeProjections', () => {
     const subjectRepo = new SubjectRepository(db)
     const topicRepo = new TopicRepository(db)
     const questionRepo = new QuestionRepository(db)
-    
+
     const s2 = await subjectRepo.create({ name: 'S2', description: 'desc2' })
     const t2 = await topicRepo.create({ subjectId: s2.id, name: 'T2' })
     const q4 = await questionRepo.create({ subjectId: s2.id, topicId: t2.id, questionText: 'Q4', options: ['A', 'B'], correctOptionIndex: 0, difficulty: 'easy', explanation: 'e' })
 
     await createAttempt(1000, [{ questionId: q1Id, isCorrect: false }])
-    
+
     const inputS2: QuizAttemptSessionSaveInput = {
       subjectId: s2.id,
       topicId: t2.id,
