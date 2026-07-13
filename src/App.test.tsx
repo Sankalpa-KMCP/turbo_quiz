@@ -8,17 +8,19 @@ describe('App Shell and Routing', () => {
     window.history.pushState({}, '', '/')
   })
 
-  it('renders the application shell and Dashboard by default', () => {
+  it('renders the application shell and Dashboard by default', async () => {
     render(<App />)
 
     // Check for brand logo / title in sidebar & header
     expect(screen.getAllByText('TurboQuiz')).toHaveLength(2)
 
     // Check if default page (Dashboard) is rendered
-    expect(screen.getByRole('heading', { name: /Dashboard/i })).toBeInTheDocument()
-    expect(
-      screen.getByText(/Welcome to TurboQuiz. This page will display your overall progress/i)
-    ).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Dashboard/i })).toBeInTheDocument()
+      expect(
+        screen.getByText(/Track your overall performance, strengths, and subject-level proficiency/i)
+      ).toBeInTheDocument()
+    })
   })
 
   it('navigates to the Subjects page when clicking the sidebar link', () => {
