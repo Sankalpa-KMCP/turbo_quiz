@@ -119,6 +119,22 @@ export class TopicRepository {
     }
   }
 
+  async getAll(): Promise<Topic[]> {
+    try {
+      const list = await this.db.topics.toArray()
+      return list.sort((a, b) => {
+        const cmp = a.normalizedName.localeCompare(b.normalizedName)
+        if (cmp !== 0) return cmp
+        return a.id - b.id
+      })
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'Topic',
+        operation: 'read'
+      })
+    }
+  }
+
   async update(id: number, input: TopicUpdateInput): Promise<Topic> {
     const parsed = validateSchema(topicUpdateSchema, input, 'Topic')
     let repoError: unknown = null

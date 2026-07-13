@@ -27,6 +27,12 @@ export interface DashboardMetrics {
     totalQuestions: number
     accuracyPercentage: number
   }
+  mistakesStats: {
+    attemptsCount: number
+    correctAnswers: number
+    totalQuestions: number
+    accuracyPercentage: number
+  }
 }
 
 /**
@@ -49,7 +55,8 @@ export function computeDashboardMetrics(attempts: QuizAttempt[], activeSubjects:
     totalTimeSpentSeconds: 0,
     subjectPerformance: {},
     practiceStats: { attemptsCount: 0, correctAnswers: 0, totalQuestions: 0, accuracyPercentage: 0 },
-    examStats: { attemptsCount: 0, correctAnswers: 0, totalQuestions: 0, accuracyPercentage: 0 }
+    examStats: { attemptsCount: 0, correctAnswers: 0, totalQuestions: 0, accuracyPercentage: 0 },
+    mistakesStats: { attemptsCount: 0, correctAnswers: 0, totalQuestions: 0, accuracyPercentage: 0 }
   }
 
   if (attempts.length === 0) {
@@ -99,6 +106,10 @@ export function computeDashboardMetrics(attempts: QuizAttempt[], activeSubjects:
       metrics.examStats.attemptsCount++
       metrics.examStats.correctAnswers += attempt.correctAnswers
       metrics.examStats.totalQuestions += attempt.totalQuestions
+    } else if (attempt.mode === 'mistakes') {
+      metrics.mistakesStats.attemptsCount++
+      metrics.mistakesStats.correctAnswers += attempt.correctAnswers
+      metrics.mistakesStats.totalQuestions += attempt.totalQuestions
     }
   }
 
@@ -123,6 +134,12 @@ export function computeDashboardMetrics(attempts: QuizAttempt[], activeSubjects:
   if (metrics.examStats.totalQuestions > 0) {
     metrics.examStats.accuracyPercentage = Math.round(
       (metrics.examStats.correctAnswers / metrics.examStats.totalQuestions) * 100
+    )
+  }
+
+  if (metrics.mistakesStats.totalQuestions > 0) {
+    metrics.mistakesStats.accuracyPercentage = Math.round(
+      (metrics.mistakesStats.correctAnswers / metrics.mistakesStats.totalQuestions) * 100
     )
   }
 

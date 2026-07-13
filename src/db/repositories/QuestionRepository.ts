@@ -168,6 +168,19 @@ export class QuestionRepository {
     return question
   }
 
+  async getByIds(ids: number[]): Promise<Question[]> {
+    try {
+      if (ids.length === 0) return []
+      const results = await this.db.questions.bulkGet(ids)
+      return results.filter((q): q is Question => q !== undefined)
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'Question',
+        operation: 'read'
+      })
+    }
+  }
+
   async update(id: number, input: QuestionUpdateInput): Promise<Question> {
     const parsed = validateSchema(questionUpdateSchema, input, 'Question')
     let repoError: unknown = null

@@ -13,6 +13,7 @@ describe('computeDashboardMetrics', () => {
     expect(metrics.subjectPerformance).toEqual({})
     expect(metrics.practiceStats.accuracyPercentage).toBe(0)
     expect(metrics.examStats.accuracyPercentage).toBe(0)
+    expect(metrics.mistakesStats.accuracyPercentage).toBe(0)
   })
 
   it('aggregates total values correctly', () => {
@@ -214,9 +215,23 @@ describe('computeDashboardMetrics', () => {
         totalQuestions: 10,
         correctAnswers: 6,
         scorePercentage: 60,
+        timeTakenSeconds: 300,
+        startedAt: 1000,
+        completedAt: 2000,
+        subjectNameSnap: 'S1',
+        topicNameSnap: null
+      },
+      {
+        id: 3,
+        subjectId: 1,
+        topicId: null,
+        mode: 'mistakes',
+        totalQuestions: 10,
+        correctAnswers: 9,
+        scorePercentage: 90,
         timeTakenSeconds: 100,
-        startedAt: 2000,
-        completedAt: 3000,
+        startedAt: 3000,
+        completedAt: 4000,
         subjectNameSnap: 'Math',
         topicNameSnap: null
       }
@@ -231,5 +246,7 @@ describe('computeDashboardMetrics', () => {
     expect(metrics.practiceStats.accuracyPercentage).toBe(80)
     expect(metrics.examStats.attemptsCount).toBe(1)
     expect(metrics.examStats.accuracyPercentage).toBe(60)
+    expect(metrics.mistakesStats.attemptsCount).toBe(1)
+    expect(metrics.mistakesStats.accuracyPercentage).toBe(90)
   })
 })

@@ -6,8 +6,9 @@ import { type QuestionSearchFilter } from '../db/repositories/QuestionRepository
 export interface SetupConfig {
   subjectId: number
   topicId: number | null
-  mode: 'practice' | 'exam'
+  mode: 'practice' | 'exam' | 'mistakes'
   questionCount: number | 'all'
+  retryQuestionIds?: number[]
 }
 
 export interface SessionQuestion {
@@ -38,6 +39,7 @@ export interface QuizSessionDependencies {
   }
   questionRepository: {
     search(filter: QuestionSearchFilter): Promise<Question[]>
+    getByIds(ids: number[]): Promise<Question[]>
   }
   quizRepository: {
     save(input: QuizAttemptSessionSaveInput): Promise<{ id: number }>
@@ -120,12 +122,18 @@ export const createQuizSessionStore = (dependencies: QuizSessionDependencies) =>
       ...DEFAULT_STATE,
 
       configureSetup: (config) => {
-        if (config.mode !== 'practice' && config.mode !== 'exam') {
+        if (config.mode !== 'practice' && config.mode !== 'exam' && config.mode !== 'mistakes') {
           throw new Error(`Unsupported mode: ${config.mode}`)
         }
         startGeneration++
+
+        let dedupedRetryIds: number[] | undefined = undefined
+        if (config.retryQuestionIds && config.retryQuestionIds.length > 0) {
+          dedupedRetryIds = Array.from(new Set(config.retryQuestionIds))
+        }
+
         set({
-          setupConfig: config,
+          setupConfig: { ...config, retryQuestionIds: dedupedRetryIds },
           phase: 'configured',
           error: null
         })
@@ -169,12 +177,18 @@ export const createQuizSessionStore = (dependencies: QuizSessionDependencies) =>
           }
 
           // 3. Load eligible Questions through repository
-          const candidateQuestions = await dependencies.questionRepository.search({
-            subjectId: config.subjectId,
-            topicFilter: config.topicId
-              ? { kind: 'topic', topicId: config.topicId }
-              : { kind: 'all' }
-          })
+          let candidateQuestions: Question[] = []
+          if (config.retryQuestionIds) {
+            candidateQuestions = await dependencies.questionRepository.getByIds(config.retryQuestionIds)
+            candidateQuestions = candidateQuestions.filter(q => q.subjectId === config.subjectId)
+          } else {
+            candidateQuestions = await dependencies.questionRepository.search({
+              subjectId: config.subjectId,
+              topicFilter: config.topicId
+                ? { kind: 'topic', topicId: config.topicId }
+                : { kind: 'all' }
+            })
+          }
           if (startGeneration !== currentGen) return
 
           if (candidateQuestions.length === 0) {
@@ -251,8 +265,8 @@ export const createQuizSessionStore = (dependencies: QuizSessionDependencies) =>
           throw new Error('Option index out of bounds')
         }
 
-        // Practice mode: lock the answer after first selection
-        if (state.setupConfig?.mode === 'practice' && ans.selectedOptionIndex !== null) {
+        // Practice or mistakes mode: lock the answer after first selection
+        if ((state.setupConfig?.mode === 'practice' || state.setupConfig?.mode === 'mistakes') && ans.selectedOptionIndex !== null) {
           return
         }
 
@@ -426,7 +440,8 @@ const productionDependencies: QuizSessionDependencies = {
     requireById: (id) => topicRepo.requireById(id)
   },
   questionRepository: {
-    search: (filter) => questionRepo.search(filter)
+    search: (filter) => questionRepo.search(filter),
+    getByIds: (ids) => questionRepo.getByIds(ids)
   },
   quizRepository: {
     save: (input) => quizRepo.save(input)

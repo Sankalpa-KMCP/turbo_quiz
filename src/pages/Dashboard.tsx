@@ -229,6 +229,21 @@ export default function Dashboard() {
                     <span className="text-[10px] text-slate-500 block">Accuracy</span>
                   </div>
                 </div>
+                {/* Mistakes Mode Card */}
+                <div className="bg-slate-950/40 p-4 rounded-xl border border-slate-850 flex justify-between items-center">
+                  <div className="space-y-1">
+                    <span className="text-sm font-bold text-slate-300">Mistakes</span>
+                    <span className="text-xs text-slate-500 block">
+                      {metrics.mistakesStats.attemptsCount} completions
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-xl font-black text-slate-200 block">
+                      {metrics.mistakesStats.attemptsCount > 0 ? `${metrics.mistakesStats.accuracyPercentage}%` : '-'}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block">Accuracy</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

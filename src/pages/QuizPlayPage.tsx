@@ -70,6 +70,7 @@ export default function QuizPlayPage() {
 
   const isLastQuestion = currentIndex === questions.length - 1
   const mode = setupConfig?.mode ?? 'practice'
+  const showsFeedback = mode === 'practice' || mode === 'mistakes'
 
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60)
@@ -160,8 +161,8 @@ export default function QuizPlayPage() {
               optionStyle = 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
             }
 
-            // Practice Mode Feedback
-            if (mode === 'practice' && isAnswered) {
+            // Feedback Mode
+            if (showsFeedback && isAnswered) {
               if (isCorrectAnswer) {
                 optionStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-medium'
               } else if (isSelected) {
@@ -176,11 +177,11 @@ export default function QuizPlayPage() {
                 key={idx}
                 type="button"
                 onClick={() => selectAnswer(idx)}
-                disabled={mode === 'practice' && isAnswered}
+                disabled={showsFeedback && isAnswered}
                 className={`w-full text-left p-4 rounded-xl border transition-all cursor-pointer flex justify-between items-center ${optionStyle}`}
               >
                 <span>{option}</span>
-                {mode === 'practice' && isAnswered && (
+                {showsFeedback && isAnswered && (
                   <span>
                     {isCorrectAnswer && (
                       <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -199,8 +200,8 @@ export default function QuizPlayPage() {
           })}
         </div>
 
-        {/* Practice Mode Explanation */}
-        {mode === 'practice' && isAnswered && currentQuestion.questionSnapshot.explanation && (
+        {/* Feedback Mode Explanation */}
+        {showsFeedback && isAnswered && currentQuestion.questionSnapshot.explanation && (
           <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl space-y-2 mt-4">
             <h4 className="text-sm font-semibold text-emerald-400">Explanation</h4>
             <p className="text-sm text-slate-300 whitespace-pre-wrap">

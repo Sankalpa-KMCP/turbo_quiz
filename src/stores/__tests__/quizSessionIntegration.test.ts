@@ -65,7 +65,8 @@ describe('Quiz Session Full Persistence Integration', () => {
         requireById: (id) => topicRepo.requireById(id)
       },
       questionRepository: {
-        search: (filter) => questionRepo.search(filter)
+        search: (filter) => questionRepo.search(filter),
+        getByIds: (ids) => questionRepo.getByIds(ids)
       },
       quizRepository: {
         save: (input) => quizRepo.save(input)

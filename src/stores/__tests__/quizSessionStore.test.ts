@@ -5,7 +5,7 @@ describe('QuizSessionStore', () => {
   let dependencies: QuizSessionDependencies
   let mockSubjectRepo: { requireById: Mock }
   let mockTopicRepo: { requireById: Mock }
-  let mockQuestionRepo: { search: Mock }
+  let mockQuestionRepo: { search: Mock; getByIds: Mock }
   let mockQuizRepo: { save: Mock }
   let currentTime: number
   let mockRandomVal: number
@@ -37,6 +37,17 @@ describe('QuizSessionStore', () => {
           correctOptionIndex: 1,
           explanation: 'Exp2',
           difficulty: 'medium'
+        }
+      ]),
+      getByIds: vi.fn().mockResolvedValue([
+        {
+          id: 10,
+          subjectId: 1,
+          questionText: 'Q1',
+          options: ['A', 'B'],
+          correctOptionIndex: 0,
+          explanation: 'Exp1',
+          difficulty: 'easy'
         }
       ])
     }
@@ -88,15 +99,18 @@ describe('QuizSessionStore', () => {
       questionCount: 'all'
     })
 
-    // Expect configureSetup to throw error on unsupported mode
+    // It should allow mistakes mode and deduplicate retryQuestionIds
     expect(() => {
       store.getState().configureSetup({
         subjectId: 1,
         topicId: null,
-        mode: 'mistakes' as unknown as 'practice',
-        questionCount: 'all'
+        mode: 'mistakes',
+        questionCount: 'all',
+        retryQuestionIds: [10, 10, 20]
       })
-    }).toThrow()
+    }).not.toThrow()
+
+    expect(store.getState().setupConfig?.retryQuestionIds).toEqual([10, 20])
   })
 
   it('loads and starts session correctly, copying snapshots', async () => {
@@ -211,6 +225,23 @@ describe('QuizSessionStore', () => {
     // Answer can be changed in exam
     examStore.getState().selectAnswer(0)
     expect(examStore.getState().answers[10].selectedOptionIndex).toBe(0)
+
+    // Mistakes mode test
+    const mistakesStore = createQuizSessionStore(dependencies)
+    mistakesStore.getState().configureSetup({
+      subjectId: 1,
+      topicId: null,
+      mode: 'mistakes',
+      questionCount: 'all'
+    })
+    await mistakesStore.getState().startSession()
+
+    mistakesStore.getState().selectAnswer(1)
+    expect(mistakesStore.getState().answers[10].selectedOptionIndex).toBe(1)
+
+    // Answer is locked in mistakes
+    mistakesStore.getState().selectAnswer(0)
+    expect(mistakesStore.getState().answers[10].selectedOptionIndex).toBe(1)
   })
 
   it('accumulates timing correctly on navigation, skipping, and completion', async () => {
@@ -487,5 +518,22 @@ describe('QuizSessionStore', () => {
     expect(store.getState().phase).toBe('playing')
     expect(store.getState().subjectNameSnap).toBe('Subject 2')
     expect(store.getState().questions[0].questionId).toBe(101)
+  })
+
+  it('loads questions via getByIds for retry sessions', async () => {
+    const store = createQuizSessionStore(dependencies)
+    store.getState().configureSetup({
+      subjectId: 1,
+      topicId: null,
+      mode: 'mistakes',
+      questionCount: 'all',
+      retryQuestionIds: [10]
+    })
+    await store.getState().startSession()
+
+    expect(mockQuestionRepo.getByIds).toHaveBeenCalledWith([10])
+    expect(mockQuestionRepo.search).not.toHaveBeenCalled()
+    expect(store.getState().questions.length).toBe(1)
+    expect(store.getState().questions[0].questionId).toBe(10)
   })
 })

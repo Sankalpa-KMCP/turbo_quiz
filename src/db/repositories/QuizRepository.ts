@@ -16,6 +16,13 @@ import { z } from 'zod'
 
 const positiveIdSchema = z.number().int().positive('Id must be a positive integer')
 
+export interface MistakeProjection {
+  answerAttempt: AnswerAttempt
+  parentAttempt: QuizAttempt
+  kind: 'active' | 'deleted-history'
+  wasSkipped: boolean
+}
+
 export class QuizRepository {
   private readonly db: QuizDatabase
   private readonly now: () => number
@@ -210,6 +217,67 @@ export class QuizRepository {
         }
         return b.id - a.id
       })
+    } catch (err) {
+      translatePersistenceError(err, {
+        entityType: 'QuizAttempt',
+        operation: 'read'
+      })
+    }
+  }
+
+  async getMistakeProjections(filters?: { subjectId?: number, topicId?: number }): Promise<MistakeProjection[]> {
+    try {
+      let attemptsQuery = this.db.quizAttempts.toCollection()
+      if (filters?.subjectId !== undefined) {
+        attemptsQuery = this.db.quizAttempts.where('subjectId').equals(filters.subjectId)
+      }
+
+      let attempts = await attemptsQuery.toArray()
+
+      if (filters?.topicId !== undefined) {
+        attempts = attempts.filter(a => a.topicId === filters.topicId)
+      }
+
+      attempts.sort((a, b) => {
+        if (b.completedAt !== a.completedAt) {
+          return b.completedAt - a.completedAt
+        }
+        return b.id - a.id
+      })
+
+      const projections: MistakeProjection[] = []
+      const seenQuestionIds = new Set<number>()
+
+      for (const attempt of attempts) {
+        const answers = await this.db.answerAttempts.where('quizAttemptId').equals(attempt.id).toArray()
+        answers.sort((a, b) => a.id - b.id)
+
+        for (const answer of answers) {
+          if (answer.questionId === null) {
+            if (!answer.isCorrect) {
+              projections.push({
+                answerAttempt: answer,
+                parentAttempt: attempt,
+                kind: 'deleted-history',
+                wasSkipped: answer.selectedOptionIndex === null
+              })
+            }
+          } else {
+            if (!seenQuestionIds.has(answer.questionId)) {
+              seenQuestionIds.add(answer.questionId)
+              if (!answer.isCorrect) {
+                projections.push({
+                  answerAttempt: answer,
+                  parentAttempt: attempt,
+                  kind: 'active',
+                  wasSkipped: answer.selectedOptionIndex === null
+                })
+              }
+            }
+          }
+        }
+      }
+      return projections
     } catch (err) {
       translatePersistenceError(err, {
         entityType: 'QuizAttempt',

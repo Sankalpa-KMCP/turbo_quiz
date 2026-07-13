@@ -186,6 +186,9 @@ describe('Dashboard', () => {
     // Exam completions: 1 (Math 2). Accuracy: 9/10 = 90%
     expect(screen.getByText(/1 completions/i)).toBeInTheDocument()
     expect(screen.getByText('90%')).toBeInTheDocument()
+
+    // Mistakes completions: 0
+    expect(screen.getByText(/0 completions/i)).toBeInTheDocument()
   })
 
   it('limits recent attempts list to 5 items sorted descending', async () => {
