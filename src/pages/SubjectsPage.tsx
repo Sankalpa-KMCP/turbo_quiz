@@ -204,6 +204,8 @@ export default function SubjectsPage() {
               <div key={sub.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 transition-all hover:border-slate-700">
                 {isDeletingThis ? (
                   <div
+                    role="dialog"
+                    aria-modal="true"
                     className="space-y-4 focus:outline-none"
                     aria-labelledby={`delete-heading-${sub.id}`}
                     tabIndex={-1}

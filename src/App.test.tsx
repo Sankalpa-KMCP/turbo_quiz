@@ -1,6 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import App from './App'
+
+vi.mock('./components/layout/ReloadPrompt', () => ({
+  ReloadPrompt: () => null
+}))
 
 describe('App Shell and Routing', () => {
   beforeEach(() => {
@@ -23,7 +27,7 @@ describe('App Shell and Routing', () => {
     })
   })
 
-  it('navigates to the Subjects page when clicking the sidebar link', () => {
+  it('navigates to the Subjects page when clicking the sidebar link', async () => {
     render(<App />)
 
     const subjectsLinks = screen.getAllByRole('link', { name: /Subjects/i })
@@ -31,7 +35,7 @@ describe('App Shell and Routing', () => {
 
     fireEvent.click(subjectsLinks[0])
 
-    expect(screen.getByRole('heading', { name: /Subjects/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Subjects/i })).toBeInTheDocument()
     expect(screen.getByText(/Manage the subjects you want to practice/i)).toBeInTheDocument()
   })
 
@@ -44,23 +48,23 @@ describe('App Shell and Routing', () => {
     })
   })
 
-  it('redirects /quiz/play without an active session to /quiz/setup', () => {
+  it('redirects /quiz/play without an active session to /quiz/setup', async () => {
     window.history.pushState({}, '', '/quiz/play')
     render(<App />)
-    expect(screen.getByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
   })
 
-  it('redirects legacy /quiz/results without attemptId to /quiz/setup', () => {
+  it('redirects legacy /quiz/results without attemptId to /quiz/setup', async () => {
     window.history.pushState({}, '', '/quiz/results')
     render(<App />)
-    expect(screen.getByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Configure Quiz/i })).toBeInTheDocument()
   })
 
-  it('renders 404 not found page for unmatched routes', () => {
+  it('renders 404 not found page for unmatched routes', async () => {
     window.history.pushState({}, '', '/some-non-existent-route')
     render(<App />)
 
-    expect(screen.getByRole('heading', { name: /404/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /404/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /Page Not Found/i })).toBeInTheDocument()
   })
 

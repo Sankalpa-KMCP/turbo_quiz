@@ -197,9 +197,12 @@ export default function SubjectDetailPage() {
     setDeletingTopicId(id)
   }
 
-  const cancelTopicDelete = () => {
+  const cancelTopicDelete = (id: number) => {
     setDeletingTopicId(null)
     setActionError(null)
+    setTimeout(() => {
+      document.getElementById(`delete-trigger-${id}`)?.focus()
+    }, 0)
   }
 
   const executeTopicDelete = async () => {
@@ -339,15 +342,24 @@ export default function SubjectDetailPage() {
             <div key={t.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 transition-all hover:border-slate-700">
               {isDeletingThis ? (
                 <div
+                  role="dialog"
+                  aria-modal="true"
                   className="space-y-4 focus:outline-none"
                   aria-labelledby={`delete-topic-heading-${t.id}`}
+                  aria-describedby={`delete-topic-desc-${t.id}`}
                   tabIndex={-1}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape' && !isSubmittingAction) {
+                      e.stopPropagation()
+                      cancelTopicDelete(t.id)
+                    }
+                  }}
                 >
                   <div className="space-y-2">
                     <h3 id={`delete-topic-heading-${t.id}`} className="text-lg font-bold text-slate-100">
                       Delete Topic: {t.name}
                     </h3>
-                    <p className="text-sm text-slate-400">
+                    <p id={`delete-topic-desc-${t.id}`} className="text-sm text-slate-400">
                       Are you sure you want to delete this topic?
                       <span className="block text-amber-400 font-semibold mt-1">
                         Any current questions linked to this topic will become Uncategorized under this subject. Historical quiz snapshots will be preserved.
@@ -358,7 +370,7 @@ export default function SubjectDetailPage() {
                     <button
                       ref={cancelRef}
                       type="button"
-                      onClick={cancelTopicDelete}
+                      onClick={() => cancelTopicDelete(t.id)}
                       disabled={isSubmittingAction}
                       className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm cursor-pointer transition-colors"
                     >
@@ -434,6 +446,7 @@ export default function SubjectDetailPage() {
                       Edit
                     </button>
                     <button
+                      id={`delete-trigger-${t.id}`}
                       type="button"
                       onClick={() => confirmTopicDelete(t.id)}
                       className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg text-xs cursor-pointer transition-colors"

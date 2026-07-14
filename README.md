@@ -1,6 +1,14 @@
 # React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Local-First Privacy & Offline
+Turbo Quiz stores all data locally in your browser using IndexedDB.
+- No cloud sync, telemetry, or server-side accounts are required.
+- All quizzes, progress, and history remain private to your device.
+- The app can be installed as a PWA (Progressive Web App) for offline access. The core application shell and routing are cached automatically after your first visit.
+
+> **Note on Deployment**: Turbo Quiz uses a client-side Single Page Application (SPA) architecture. If deployed to a static host (like GitHub Pages, Netlify, or Vercel), ensure the host is configured to fallback all missing routes to `index.html` to support deep-linking and offline reload.
+
+## Getting Started
 
 Currently, two official plugins are available:
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react'
+import { useState, useEffect, useRef, type ReactNode, Suspense } from 'react'
 import { Link, useLocation, Outlet } from 'react-router-dom'
 
 interface NavItem {
@@ -291,7 +291,14 @@ export default function AppLayout() {
         className="flex-1 p-6 lg:p-10 max-w-6xl mx-auto w-full outline-none"
         tabIndex={-1}
       >
-        <Outlet />
+        <Suspense fallback={
+          <div className="flex flex-col items-center justify-center min-h-[40vh] space-y-4 text-center" aria-live="polite">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
+            <p className="text-slate-400 text-sm">Loading page...</p>
+          </div>
+        }>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   )

@@ -161,4 +161,61 @@ describe('SubjectDetailPage', () => {
       expect(within(topicBlock!).getByText(/1 Questions/i)).toBeInTheDocument()
     })
   })
+
+  it('provides an accessible delete-topic dialog with focus management and Escape key support', async () => {
+    const sub = await subjectRepo.create({ name: 'Mock', description: null })
+    await topicRepo.create({ subjectId: sub.id, name: 'Accessibility Test Topic' })
+
+    renderWithRouter(sub.id.toString())
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Accessibility Test Topic' })).toBeInTheDocument()
+    })
+
+    const deleteBtn = screen.getByRole('button', { name: /Delete/i })
+    deleteBtn.focus() // Ensure it is the active element before clicking
+    fireEvent.click(deleteBtn)
+
+    await waitFor(() => {
+      // Verify dialog semantics
+      const dialog = screen.getByRole('dialog', { name: 'Delete Topic: Accessibility Test Topic' })
+      expect(dialog).toBeInTheDocument()
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(dialog).toHaveAttribute('aria-describedby')
+    })
+
+    const dialog = screen.getByRole('dialog')
+
+    // Test Escape key
+    fireEvent.keyDown(dialog, { key: 'Escape', code: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    // Focus restoration is deferred by setTimeout, wait for it
+    await waitFor(() => {
+      const newDeleteBtn = screen.getByRole('button', { name: /Delete/i })
+      expect(document.activeElement).toBe(newDeleteBtn)
+    })
+
+    // Test Cancel button
+    const restoredDeleteBtn = screen.getByRole('button', { name: /Delete/i })
+    fireEvent.click(restoredDeleteBtn) // reopen
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    const cancelBtn = screen.getByRole('button', { name: /Cancel/i })
+    fireEvent.click(cancelBtn)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    await waitFor(() => {
+      const finalDeleteBtn = screen.getByRole('button', { name: /Delete/i })
+      expect(document.activeElement).toBe(finalDeleteBtn)
+    })
+  })
 })

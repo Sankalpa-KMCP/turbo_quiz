@@ -75,7 +75,10 @@ describe('SettingsPage', () => {
     expect(mockCreateObjectURL).toHaveBeenCalled()
     expect(appendSpy).toHaveBeenCalled()
     expect(removeSpy).toHaveBeenCalled()
-    expect(mockRevokeObjectURL).toHaveBeenCalled()
+
+    await waitFor(() => {
+      expect(mockRevokeObjectURL).toHaveBeenCalled()
+    })
   })
 
   it('handles file import successfully', async () => {

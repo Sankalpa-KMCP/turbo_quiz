@@ -228,7 +228,7 @@ export default function QuestionsPage() {
                       {q.difficulty}
                     </span>
                   </div>
-                  <h3 className="text-lg font-medium text-slate-100 whitespace-pre-wrap">{q.questionText}</h3>
+                  <h3 className="text-lg font-medium text-slate-100 whitespace-pre-wrap break-words">{q.questionText}</h3>
                 </div>
 
                 <div className="flex sm:flex-col gap-2 shrink-0">

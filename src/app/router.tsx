@@ -1,24 +1,29 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import AppLayout from '@/components/layout/AppLayout'
-import Dashboard from '@/pages/Dashboard'
-import SubjectsPage from '@/pages/SubjectsPage'
-import SubjectDetailPage from '@/pages/SubjectDetailPage'
-import QuestionsPage from '@/pages/QuestionsPage'
-import QuestionFormPage from '@/pages/QuestionFormPage'
-import QuizSetupPage from '@/pages/QuizSetupPage'
-import QuizPlayPage from '@/pages/QuizPlayPage'
-import QuizResultsPage from '@/pages/QuizResultsPage'
-import MistakesPage from '@/pages/MistakesPage'
-import HistoryPage from '@/pages/HistoryPage'
-import SettingsPage from '@/pages/SettingsPage'
-import NotFoundPage from '@/pages/NotFoundPage'
+import { lazy } from 'react'
+
+const Dashboard = lazy(() => import('@/pages/Dashboard'))
+const SubjectsPage = lazy(() => import('@/pages/SubjectsPage'))
+const SubjectDetailPage = lazy(() => import('@/pages/SubjectDetailPage'))
+const QuestionsPage = lazy(() => import('@/pages/QuestionsPage'))
+const QuestionFormPage = lazy(() => import('@/pages/QuestionFormPage'))
+const QuizSetupPage = lazy(() => import('@/pages/QuizSetupPage'))
+const QuizPlayPage = lazy(() => import('@/pages/QuizPlayPage'))
+const QuizResultsPage = lazy(() => import('@/pages/QuizResultsPage'))
+const MistakesPage = lazy(() => import('@/pages/MistakesPage'))
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'))
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+
+import GlobalErrorBoundary from '@/components/layout/GlobalErrorBoundary'
 
 export function createRouter() {
   return createBrowserRouter([
     {
       path: '/',
       element: <AppLayout />,
-      errorElement: <NotFoundPage />,
+      errorElement: <GlobalErrorBoundary />,
       children: [
         {
           index: true,

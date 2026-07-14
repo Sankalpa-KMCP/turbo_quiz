@@ -105,8 +105,9 @@ describe('Content Integration (E2E Authoring)', () => {
 
     // Choose the newly created topic manually
     const topicSelect = screen.getByLabelText(/Topic/i)
+    const topicOption = await screen.findByRole('option', { name: 'Cell Structure' })
     fireEvent.change(topicSelect, {
-      target: { value: screen.getByText('Cell Structure').closest('option')?.value }
+      target: { value: (topicOption as HTMLOptionElement).value }
     })
 
     const options = screen.getAllByPlaceholderText(/Option \d/)

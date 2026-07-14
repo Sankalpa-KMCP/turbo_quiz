@@ -214,6 +214,8 @@ export default function QuizPlayPage() {
       {/* Navigation and Actions or Inline Confirmation */}
       {showConfirm ? (
         <div
+          role="dialog"
+          aria-modal="true"
           className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 focus:outline-none"
           aria-labelledby="confirm-heading"
         >
