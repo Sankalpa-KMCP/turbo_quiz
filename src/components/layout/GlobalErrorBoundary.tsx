@@ -34,14 +34,14 @@ export default function GlobalErrorBoundary() {
 
   // Handle generic rendering or chunk loading errors
   const isChunkError = error instanceof Error && error.name === 'ChunkLoadError'
-  const errorMessage = isChunkError 
+  const errorMessage = isChunkError
     ? "A new version of the application is available. Please reload to apply updates."
     : "An unexpected error occurred while rendering this page."
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center font-sans">
-      <div 
-        role="alert" 
+      <div
+        role="alert"
         aria-live="assertive"
         className="max-w-md w-full bg-slate-900 border border-slate-800 p-8 rounded-2xl space-y-6 shadow-2xl"
       >
