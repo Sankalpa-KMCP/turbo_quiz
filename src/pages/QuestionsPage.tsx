@@ -9,8 +9,6 @@ import type { TopicFilter } from '../db/repositories/QuestionRepository'
 import type { BookmarkStatus, Difficulty } from '../types/db'
 import { useDebounce } from '../utils/useDebounce'
 
-import { Card } from '../components/ui/Card'
-import { Badge } from '../components/ui/Badge'
 import { Select } from '../components/ui/Select'
 import { Input } from '../components/ui/Input'
 import { buttonStyles } from '../components/ui/buttonStyles'
@@ -29,15 +27,14 @@ export default function QuestionsPage() {
   const parsedSubjectId = Number(subjectIdParam)
   const isValidSubjectId = !isNaN(parsedSubjectId) && parsedSubjectId > 0 && Number.isInteger(parsedSubjectId)
 
-  const topicIdParam = searchParams.get('topicId') // 'uncategorized', number, or null
+  const topicIdParam = searchParams.get('topicId')
   const difficultyParam = searchParams.get('difficulty') as Difficulty | null
-  const bookmarkParam = searchParams.get('bookmark') // '1' or null
+  const bookmarkParam = searchParams.get('bookmark')
   const rawSearchText = searchParams.get('q') || ''
 
   const [searchText, setSearchText] = useState(rawSearchText)
   const debouncedSearchText = useDebounce(searchText, 300)
 
-  // Update URL on debounced search text change
   useEffect(() => {
     if (debouncedSearchText !== rawSearchText) {
       setSearchParams(prev => {
@@ -93,12 +90,12 @@ export default function QuestionsPage() {
 
   if (!isValidSubjectId) {
     if (allSubjects === undefined) {
-      return <LoadingState label="Loading subjects…" />
+      return <LoadingState label="Loading subjects?" />
     }
 
     if (allSubjects.length === 0) {
       return (
-        <div className="max-w-5xl mx-auto space-y-6">
+        <div className="mx-auto max-w-3xl space-y-6">
           <PageHeader
             title="Questions Bank"
             description="Questions are organized inside subjects so your practice sessions stay focused."
@@ -118,12 +115,12 @@ export default function QuestionsPage() {
     }
 
     return (
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         <PageHeader
           title="Questions Bank"
           description="Choose a subject to browse, search, create, and edit questions in its bank."
         />
-        <Card className="p-4 sm:p-5">
+        <section className="rounded-lg border border-border-subtle bg-surface-raised p-4 sm:p-5">
           <h2 className="text-sm font-semibold text-text-main">Select a subject</h2>
           <p className="mt-1 text-sm text-text-muted">
             Questions stay scoped to one subject so practice sessions remain focused.
@@ -133,7 +130,7 @@ export default function QuestionsPage() {
               <li key={item.id}>
                 <Link
                   to={`/questions?subjectId=${item.id}`}
-                  className="flex min-h-11 items-center justify-between gap-3 py-3 text-sm font-medium text-text-main transition-colors hover:text-primary-text focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised rounded-sm"
+                  className="flex min-h-11 items-center justify-between gap-3 py-3 text-sm font-medium text-text-main transition-colors hover:text-primary-text focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                 >
                   <span>{item.name}</span>
                   <svg className="w-4 h-4 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
@@ -143,19 +140,19 @@ export default function QuestionsPage() {
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
       </div>
     )
   }
 
   if (subject === undefined) {
-    return <LoadingState label="Loading question bank…" />
+    return <LoadingState label="Loading question bank?" />
   }
 
   if (subject === null) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold text-text-main">Subject Not Found</h1>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="font-serif text-2xl font-semibold text-text-main">Subject Not Found</h1>
         <p className="text-text-muted">The subject you are looking for does not exist.</p>
         <Link to="/subjects" className="text-primary-text hover:underline">Go to Subjects</Link>
       </div>
@@ -175,13 +172,16 @@ export default function QuestionsPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader
         title="Questions Bank"
         description={`${questions?.length || 0} question${questions?.length === 1 ? '' : 's'} found in ${subject.name}`}
         eyebrow={
-          <Link to={`/subjects/${subject.id}`} className="inline-flex min-h-9 items-center gap-1 rounded-lg text-sm font-medium text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <Link
+            to={`/subjects/${subject.id}`}
+            className="inline-flex min-h-9 items-center gap-1 rounded-sm text-sm font-medium text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             Back to {subject.name}
@@ -197,9 +197,11 @@ export default function QuestionsPage() {
         }
       />
 
-      {/* Filters Toolbar */}
-      <Card className="p-4 flex flex-col md:flex-row gap-4">
-        <div className="flex-1 w-full relative">
+      <section
+        aria-label="Question filters"
+        className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-raised p-3 sm:p-4"
+      >
+        <div className="w-full">
           <label htmlFor="search-q" className="sr-only">Search text</label>
           <Input
             id="search-q"
@@ -208,8 +210,8 @@ export default function QuestionsPage() {
             placeholder="Search questions..."
           />
         </div>
-        <div className="flex flex-wrap gap-3">
-          <div className="flex-1 min-w-[120px]">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
             <label htmlFor="filter-topic" className="sr-only">Topic</label>
             <Select
               id="filter-topic"
@@ -223,7 +225,7 @@ export default function QuestionsPage() {
               ))}
             </Select>
           </div>
-          <div className="flex-1 min-w-[110px]">
+          <div>
             <label htmlFor="filter-difficulty" className="sr-only">Difficulty</label>
             <Select
               id="filter-difficulty"
@@ -236,7 +238,7 @@ export default function QuestionsPage() {
               <option value="hard">Hard</option>
             </Select>
           </div>
-          <div className="flex-1 min-w-[110px]">
+          <div>
             <label htmlFor="filter-bookmark" className="sr-only">Bookmarks</label>
             <Select
               id="filter-bookmark"
@@ -248,11 +250,10 @@ export default function QuestionsPage() {
             </Select>
           </div>
         </div>
-      </Card>
+      </section>
 
-      {/* List */}
       {questions === undefined ? (
-        <LoadingState compact label="Loading questions…" />
+        <LoadingState compact label="Loading questions?" />
       ) : questions.length === 0 ? (
         <EmptyState
           title="No questions match your filters."
@@ -264,56 +265,64 @@ export default function QuestionsPage() {
           }
         />
       ) : (
-        <div className="space-y-4">
+        <ul className="divide-y divide-border-subtle border-t border-border-subtle">
           {questions.map(q => {
-            const t = topics?.find(t => t.id === q.topicId)
+            const t = topics?.find(topic => topic.id === q.topicId)
             const topicName = t ? t.name : 'Uncategorized'
+            const bookmarked = q.bookmarkStatus === 1
 
             return (
-              <Card key={q.id} className="p-4 sm:p-6 transition-all hover:border-border-strong flex flex-col sm:flex-row gap-4 sm:items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <Badge variant="default">
-                      {topicName}
-                    </Badge>
-                    <Badge variant={q.difficulty === 'easy' ? 'success' : q.difficulty === 'medium' ? 'warning' : 'danger'} className="uppercase tracking-wider">
-                      {q.difficulty}
-                    </Badge>
-                  </div>
-                  <h3 className="text-lg font-medium text-text-main whitespace-pre-wrap break-words">{q.questionText}</h3>
+              <li key={q.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-text-muted">
+                    <span>{topicName}</span>
+                    <span aria-hidden="true"> · </span>
+                    <span className="capitalize">{q.difficulty}</span>
+                    {bookmarked ? (
+                      <>
+                        <span aria-hidden="true"> · </span>
+                        <span>Bookmarked</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <h3 className="mt-1 text-base font-medium leading-6 text-text-main whitespace-pre-wrap break-words">
+                    {q.questionText}
+                  </h3>
                 </div>
 
-                <div className="flex sm:flex-col gap-2 shrink-0">
+                <div className="flex shrink-0 gap-2">
                   <button
                     type="button"
-                    title={q.bookmarkStatus === 1 ? "Remove Bookmark" : "Bookmark"}
-                    aria-label={q.bookmarkStatus === 1 ? 'Remove bookmark' : 'Bookmark question'}
-                    aria-pressed={q.bookmarkStatus === 1}
+                    title={bookmarked ? 'Remove Bookmark' : 'Bookmark'}
+                    aria-label={bookmarked ? 'Remove bookmark' : 'Bookmark question'}
+                    aria-pressed={bookmarked}
                     onClick={() => toggleBookmark(q.id, q.bookmarkStatus)}
-                    className="inline-flex size-11 items-center justify-center bg-surface-overlay hover:bg-border-strong text-text-main rounded-xl cursor-pointer transition-colors group border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex size-11 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-text-main transition-colors hover:bg-surface-overlay focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus cursor-pointer"
                   >
                     <svg
-                      className={`w-5 h-5 ${q.bookmarkStatus === 1 ? 'fill-warning-text text-warning-text' : 'fill-none stroke-current group-hover:text-warning-text group-hover:stroke-current'}`}
+                      className={`h-5 w-5 ${bookmarked ? 'fill-warning-text text-warning-text' : 'fill-none stroke-current'}`}
                       viewBox="0 0 24 24"
                       strokeWidth={2}
+                      aria-hidden="true"
                     >
                       <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                     </svg>
                   </button>
                   <Link
                     to={`/questions/${q.id}/edit`}
-                    className="inline-flex size-11 items-center justify-center bg-surface-overlay hover:bg-border-strong text-text-main rounded-xl cursor-pointer transition-colors border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                    className="inline-flex size-11 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-text-main transition-colors hover:bg-surface-overlay focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                     title="Edit Question"
+                    aria-label="Edit Question"
                   >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                     </svg>
                   </Link>
                 </div>
-              </Card>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
     </div>
   )

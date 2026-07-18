@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useForm } from 'react-hook-form'
@@ -13,10 +13,14 @@ import { topicCreateSchema } from '../schemas/topicSchema'
 import { DuplicateNameError, ValidationError } from '../db/errors'
 import type { Topic } from '../types/db'
 
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Alert } from '../components/ui/Alert'
+import { LoadingState } from '../components/ui/LoadingState'
+import { PageHeader } from '../components/ui/PageHeader'
+import { Field } from '../components/ui/Field'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
+import { buttonStyles } from '../components/ui/buttonStyles'
 
 const subjectRepo = new SubjectRepository(db)
 const topicRepo = new TopicRepository(db)
@@ -41,7 +45,6 @@ export default function SubjectDetailPage() {
     [isValidId, subject, parsedId]
   )
 
-  // Question counts per topic, plus uncategorized count
   const stats = useLiveQuery(async () => {
     if (!isValidId || !subject || !topics) return { topics: {}, uncategorized: 0, total: 0 }
     const res: Record<number, number> = {}
@@ -66,8 +69,6 @@ export default function SubjectDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
 
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
   const {
     register: registerSubjectEdit,
     handleSubmit: handleSubjectEditSubmit,
@@ -77,7 +78,6 @@ export default function SubjectDetailPage() {
     resolver: zodResolver(subjectUpdateSchema)
   })
 
-  // We omit subjectId from the form data because we inject it
   const {
     register: registerTopicCreate,
     handleSubmit: handleTopicCreateSubmit,
@@ -99,39 +99,38 @@ export default function SubjectDetailPage() {
     defaultValues: { name: '' }
   })
 
-  useEffect(() => {
-    if (deletingTopicId !== null && cancelRef.current) {
-      cancelRef.current.focus()
-    }
-  }, [deletingTopicId])
-
   if (!isValidId) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold text-text-main">Invalid Subject ID</h1>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="font-serif text-2xl font-semibold text-text-main">Invalid Subject ID</h1>
         <p className="text-text-muted">The provided subject ID is malformed.</p>
         <Link to="/subjects" className="text-primary-text hover:underline">Back to Subjects</Link>
       </div>
     )
   }
 
-  // Loading state
   if (subject === undefined) {
-    return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <div className="text-text-muted text-sm">Loading subject...</div>
-      </div>
-    )
+    return <LoadingState label="Loading subject..." />
   }
 
   if (subject === null) {
     return (
-      <div className="max-w-4xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold text-text-main">Subject Not Found</h1>
+      <div className="mx-auto max-w-3xl space-y-4">
+        <h1 className="font-serif text-2xl font-semibold text-text-main">Subject Not Found</h1>
         <p className="text-text-muted">The subject you are looking for does not exist or has been deleted.</p>
         <Link to="/subjects" className="text-primary-text hover:underline">Back to Subjects</Link>
       </div>
     )
+  }
+
+  const handleRepoError = (err: unknown) => {
+    if (err instanceof DuplicateNameError) {
+      setActionError(`A name "${err.conflictingValue}" already exists.`)
+    } else if (err instanceof ValidationError) {
+      setActionError('Validation error occurred.')
+    } else {
+      setActionError(err instanceof Error ? err.message : String(err))
+    }
   }
 
   const startSubjectEdit = () => {
@@ -189,18 +188,7 @@ export default function SubjectDetailPage() {
     }
   }
 
-  const confirmTopicDelete = (id: number) => {
-    setActionError(null)
-    setDeletingTopicId(id)
-  }
-
-  const cancelTopicDelete = (id: number) => {
-    setDeletingTopicId(null)
-    setActionError(null)
-    setTimeout(() => {
-      document.getElementById(`delete-trigger-${id}`)?.focus()
-    }, 0)
-  }
+  const deletingTopic = topics?.find((t) => t.id === deletingTopicId) ?? null
 
   const executeTopicDelete = async () => {
     if (deletingTopicId === null) return
@@ -216,88 +204,59 @@ export default function SubjectDetailPage() {
     }
   }
 
-  const handleRepoError = (err: unknown) => {
-    if (err instanceof DuplicateNameError) {
-      setActionError(`A name "${err.conflictingValue}" already exists.`)
-    } else if (err instanceof ValidationError) {
-      setActionError('Validation error occurred.')
-    } else {
-      setActionError(err instanceof Error ? err.message : String(err))
-    }
-  }
-
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
-      {/* Subject Header */}
-      <Card className="p-6 flex flex-col gap-4 relative">
-        <Link to="/subjects" className="text-sm font-medium text-primary-base hover:text-primary-hover transition-colors inline-flex items-center gap-1 w-fit">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-          Back to Subjects
-        </Link>
-
-        {isEditingSubject ? (
-          <form onSubmit={handleSubjectEditSubmit(onSubjectEdit)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end mt-2">
-            <div className="flex-1 w-full max-w-sm">
-              <label htmlFor="edit-subject-name" className="sr-only">Subject Name</label>
-              <Input
-                id="edit-subject-name"
-                {...registerSubjectEdit('name')}
-                hasError={!!subjectEditErrors.name}
-                className="text-xl font-bold"
-                autoFocus
-              />
-              {subjectEditErrors.name && (
-                <p className="text-danger-text text-xs mt-1">{subjectEditErrors.name.message}</p>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                onClick={cancelSubjectEdit}
-                disabled={isSubjectEditing}
-                variant="secondary"
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={isSubjectEditing}
-                variant="primary"
-              >
-                {isSubjectEditing ? 'Saving...' : 'Save'}
-              </Button>
-            </div>
-          </form>
-        ) : (
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-text-main tracking-tight sm:text-3xl">{subject.name}</h1>
-              <div className="flex items-center gap-4 mt-2 text-sm text-text-muted">
-                <span>{topics?.length || 0} Topics</span>
-                <span>{stats?.total || 0} Questions</span>
-              </div>
-            </div>
-            <div className="flex gap-2 items-center">
-              <Button
-                type="button"
-                onClick={startSubjectEdit}
-                variant="secondary"
-                size="sm"
-              >
-                Edit Subject Name
-              </Button>
-              <Link
-                to={`/questions/new?subjectId=${subject.id}`}
-                className="inline-flex min-h-11 items-center px-3 py-1.5 bg-primary-base hover:bg-primary-hover text-text-inverse font-medium rounded-lg text-xs cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base"
-              >
-                + New Question
-              </Link>
-            </div>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        title={subject.name}
+        description={`${topics?.length || 0} Topics · ${stats?.total || 0} Questions`}
+        eyebrow={
+          <Link
+            to="/subjects"
+            className="inline-flex min-h-9 items-center gap-1 rounded-sm text-sm font-medium text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Subjects
+          </Link>
+        }
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={startSubjectEdit} variant="secondary" size="sm">
+              Edit Subject Name
+            </Button>
+            <Link
+              to={`/questions/new?subjectId=${subject.id}`}
+              className={buttonStyles({ variant: 'primary', size: 'sm' })}
+            >
+              + New Question
+            </Link>
           </div>
-        )}
-      </Card>
+        }
+      />
+
+      {isEditingSubject ? (
+        <form onSubmit={handleSubjectEditSubmit(onSubjectEdit)} className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-surface-raised p-4 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <Field
+              id="edit-subject-name"
+              label="Subject Name"
+              required
+              error={subjectEditErrors.name?.message}
+            >
+              <Input {...registerSubjectEdit('name')} autoFocus />
+            </Field>
+          </div>
+          <div className="flex gap-2">
+            <Button type="button" onClick={cancelSubjectEdit} disabled={isSubjectEditing} variant="secondary">
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubjectEditing} variant="primary">
+              {isSubjectEditing ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </form>
+      ) : null}
 
       {actionError && (
         <Alert variant="danger">
@@ -305,190 +264,141 @@ export default function SubjectDetailPage() {
         </Alert>
       )}
 
-      {/* Topics Section */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-end">
-          <h2 className="text-xl font-bold text-text-main">Topics</h2>
-          <Link to={`/questions?subjectId=${subject.id}`} className="text-sm font-medium text-primary-base hover:text-primary-hover transition-colors">
-            View All Questions in Subject &rarr;
+      <section className="space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <h2 className="text-base font-semibold text-text-main">Topics</h2>
+          <Link
+            to={`/questions?subjectId=${subject.id}`}
+            className="text-sm font-medium text-primary-text transition-colors hover:text-primary-hover"
+          >
+            View All Questions in Subject
           </Link>
         </div>
 
-        {/* Uncategorized Pseudo-Topic */}
-        <Card className="p-4 sm:p-6 flex justify-between items-center bg-surface-overlay/30 border-dashed">
-          <div>
-            <h3 className="text-lg font-semibold text-text-main italic">Uncategorized</h3>
-            <p className="text-xs text-text-muted mt-1">{stats?.uncategorized || 0} Questions</p>
-          </div>
-          <div className="flex gap-2">
-             <Link
-                to={`/questions?subjectId=${subject.id}&topicId=uncategorized`}
-                className="inline-flex min-h-11 items-center px-3 py-1.5 bg-surface-overlay hover:bg-surface-base text-text-main font-medium rounded-lg text-xs cursor-pointer transition-colors border border-border-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base"
-              >
-                View Questions
-              </Link>
-          </div>
-        </Card>
-
-        {/* Topics List */}
-        {topics?.map(t => {
-          const isEditingThis = editingTopicId === t.id
-          const isDeletingThis = deletingTopicId === t.id
-          const qCount = stats?.topics[t.id] || 0
-
-          return (
-            <Card key={t.id} className="p-4 sm:p-6 transition-all hover:border-border-strong">
-              {isDeletingThis ? (
-                <div
-                  role="dialog"
-                  aria-modal="true"
-                  className="space-y-4 focus:outline-none"
-                  aria-labelledby={`delete-topic-heading-${t.id}`}
-                  aria-describedby={`delete-topic-desc-${t.id}`}
-                  tabIndex={-1}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape' && !isSubmittingAction) {
-                      e.stopPropagation()
-                      cancelTopicDelete(t.id)
-                    }
-                  }}
-                >
-                  <div className="space-y-2">
-                    <h3 id={`delete-topic-heading-${t.id}`} className="text-lg font-bold text-text-main">
-                      Delete Topic: {t.name}
-                    </h3>
-                    <p id={`delete-topic-desc-${t.id}`} className="text-sm text-text-muted">
-                      Are you sure you want to delete this topic?
-                      <span className="block text-warning-text font-semibold mt-1">
-                        Any current questions linked to this topic will become Uncategorized under this subject. Historical quiz snapshots will be preserved.
-                      </span>
-                    </p>
-                  </div>
-                  <div className="flex gap-3 justify-end">
-                    <Button
-                      ref={cancelRef}
-                      type="button"
-                      onClick={() => cancelTopicDelete(t.id)}
-                      disabled={isSubmittingAction}
-                      variant="secondary"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={executeTopicDelete}
-                      disabled={isSubmittingAction}
-                      variant="danger"
-                    >
-                      {isSubmittingAction ? 'Deleting...' : 'Confirm Delete'}
-                    </Button>
-                  </div>
-                </div>
-              ) : isEditingThis ? (
-                <form onSubmit={handleTopicEditSubmit(onTopicEdit)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                  <div className="flex-1 w-full">
-                    <label htmlFor={`edit-topic-${t.id}`} className="sr-only">Topic Name</label>
-                    <Input
-                      id={`edit-topic-${t.id}`}
-                      {...registerTopicEdit('name')}
-                      hasError={!!topicEditErrors.name}
-                      autoFocus
-                    />
-                    {topicEditErrors.name && (
-                      <p className="text-danger-text text-xs mt-1">{topicEditErrors.name.message}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <Button
-                      type="button"
-                      onClick={cancelTopicEdit}
-                      disabled={isTopicEditing}
-                      variant="secondary"
-                      className="flex-1 sm:flex-none"
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isTopicEditing}
-                      variant="primary"
-                      className="flex-1 sm:flex-none"
-                    >
-                      {isTopicEditing ? 'Saving...' : 'Save'}
-                    </Button>
-                  </div>
-                </form>
-              ) : (
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                  <div>
-                    <h3 className="text-lg font-bold text-text-main">{t.name}</h3>
-                    <p className="text-xs text-text-muted mt-1">{qCount} Questions</p>
-                  </div>
-                  <div className="flex gap-2 items-center">
-                    <Link
-                      to={`/questions/new?subjectId=${subject.id}&topicId=${t.id}`}
-                      className="inline-flex min-h-11 items-center px-3 py-1.5 bg-primary-base/10 hover:bg-primary-base/20 text-primary-text font-medium rounded-lg text-xs cursor-pointer transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                    >
-                      + New
-                    </Link>
-                    <Link
-                      to={`/questions?subjectId=${subject.id}&topicId=${t.id}`}
-                      className="inline-flex min-h-11 items-center px-3 py-1.5 bg-surface-overlay hover:bg-border-strong text-text-main font-medium rounded-lg text-xs cursor-pointer transition-colors border border-border-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
-                    >
-                      Questions
-                    </Link>
-                    <Button
-                      type="button"
-                      onClick={() => startTopicEdit(t)}
-                      variant="secondary"
-                      size="sm"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      id={`delete-trigger-${t.id}`}
-                      type="button"
-                      onClick={() => confirmTopicDelete(t.id)}
-                      variant="ghost"
-                      size="sm"
-                      className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </Card>
-          )
-        })}
-
-        {/* Create Topic Form */}
-        <Card className="p-4 border-dashed border-border-subtle bg-surface-base">
-          <form onSubmit={handleTopicCreateSubmit(onTopicCreate)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-            <div className="flex-1 w-full">
-              <label htmlFor="create-topic-name" className="block text-sm font-medium text-text-main mb-1">
-                New Topic Name
-              </label>
-              <Input
-                id="create-topic-name"
-                {...registerTopicCreate('name')}
-                hasError={!!topicCreateErrors.name}
-                placeholder="e.g. Algebra"
-              />
-              {topicCreateErrors.name && (
-                <p className="text-danger-text text-xs mt-1">{topicCreateErrors.name.message}</p>
-              )}
+        <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+          <li className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold italic text-text-main">Uncategorized</h3>
+              <p className="mt-0.5 text-xs text-text-muted">{stats?.uncategorized || 0} Questions</p>
             </div>
-            <Button
-              type="submit"
-              disabled={isTopicCreating}
-              className="w-full sm:w-auto"
+            <Link
+              to={`/questions?subjectId=${subject.id}&topicId=uncategorized`}
+              className={buttonStyles({ variant: 'secondary', size: 'sm' })}
             >
-              {isTopicCreating ? 'Creating...' : 'Create Topic'}
-            </Button>
-          </form>
-        </Card>
-      </div>
+              View Questions
+            </Link>
+          </li>
+
+          {topics?.map((t) => {
+            const isEditingThis = editingTopicId === t.id
+            const qCount = stats?.topics[t.id] || 0
+
+            return (
+              <li key={t.id} className="py-4">
+                {isEditingThis ? (
+                  <form onSubmit={handleTopicEditSubmit(onTopicEdit)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                    <div className="min-w-0 flex-1">
+                      <Field
+                        id={`edit-topic-${t.id}`}
+                        label="Topic Name"
+                        required
+                        error={topicEditErrors.name?.message}
+                      >
+                        <Input {...registerTopicEdit('name')} autoFocus />
+                      </Field>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="button" onClick={cancelTopicEdit} disabled={isTopicEditing} variant="secondary">
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isTopicEditing} variant="primary">
+                        {isTopicEditing ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-text-main">{t.name}</h3>
+                      <p className="mt-0.5 text-xs text-text-muted">{qCount} Questions</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        to={`/questions/new?subjectId=${subject.id}&topicId=${t.id}`}
+                        className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                      >
+                        + New
+                      </Link>
+                      <Link
+                        to={`/questions?subjectId=${subject.id}&topicId=${t.id}`}
+                        className={buttonStyles({ variant: 'secondary', size: 'sm' })}
+                      >
+                        Questions
+                      </Link>
+                      <Button type="button" onClick={() => startTopicEdit(t)} variant="secondary" size="sm">
+                        Edit
+                      </Button>
+                      <Button
+                        id={`delete-trigger-${t.id}`}
+                        type="button"
+                        onClick={() => {
+                          setActionError(null)
+                          setDeletingTopicId(t.id)
+                        }}
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+
+        <form
+          onSubmit={handleTopicCreateSubmit(onTopicCreate)}
+          className="flex flex-col gap-3 rounded-lg border border-dashed border-border-subtle bg-surface-raised/60 p-4 sm:flex-row sm:items-end"
+        >
+          <div className="min-w-0 flex-1">
+            <Field
+              id="create-topic-name"
+              label="New Topic Name"
+              required
+              error={topicCreateErrors.name?.message}
+            >
+              <Input {...registerTopicCreate('name')} placeholder="e.g. Algebra" />
+            </Field>
+          </div>
+          <Button type="submit" disabled={isTopicCreating} className="w-full sm:w-auto">
+            {isTopicCreating ? 'Creating...' : 'Create Topic'}
+          </Button>
+        </form>
+      </section>
+
+      <ConfirmDialog
+        open={deletingTopicId !== null}
+        title={deletingTopic ? `Delete Topic: ${deletingTopic.name}` : 'Delete Topic'}
+        description={
+          <>
+            <p>Are you sure you want to delete this topic?</p>
+            <p className="mt-2 font-semibold text-warning-text">
+              Any current questions linked to this topic will become Uncategorized under this subject. Historical quiz snapshots will be preserved.
+            </p>
+          </>
+        }
+        confirmLabel="Confirm Delete"
+        tone="destructive"
+        pending={isSubmittingAction}
+        onConfirm={executeTopicDelete}
+        onCancel={() => {
+          setDeletingTopicId(null)
+          setActionError(null)
+        }}
+      />
     </div>
   )
 }

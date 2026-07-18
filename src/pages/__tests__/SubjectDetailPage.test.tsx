@@ -57,7 +57,7 @@ describe('SubjectDetailPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Edit Subject Name/i }))
 
-    const input = await screen.findByLabelText('Subject Name')
+    const input = await screen.findByRole('textbox', { name: /^Subject Name/ })
     fireEvent.change(input, { target: { value: 'Advanced Science' } })
     fireEvent.click(screen.getByRole('button', { name: /Save/i }))
 
@@ -96,7 +96,7 @@ describe('SubjectDetailPage', () => {
     const editBtns = screen.getAllByRole('button', { name: 'Edit' })
     fireEvent.click(editBtns[0])
 
-    const editInput = await screen.findByLabelText('Topic Name')
+    const editInput = await screen.findByRole('textbox', { name: /^Topic Name/ })
     fireEvent.change(editInput, { target: { value: 'Linear Algebra' } })
     fireEvent.click(screen.getByRole('button', { name: /Save/i }))
 

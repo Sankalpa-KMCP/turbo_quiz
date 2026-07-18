@@ -6,12 +6,12 @@ import { SubjectRepository } from '../db/repositories/SubjectRepository'
 import { computeDashboardMetrics } from '../utils/dashboardMetrics'
 import { type QuizAttempt, type Subject } from '../types/db'
 
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { buttonStyles } from '../components/ui/buttonStyles'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { PageHeader } from '../components/ui/PageHeader'
+import { Alert } from '../components/ui/Alert'
 
 const quizRepo = new QuizRepository(db)
 const subjectRepo = new SubjectRepository(db)
@@ -50,7 +50,6 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Format total seconds into human readable duration
   const formatTotalTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600)
     const minutes = Math.floor((totalSeconds % 3600) / 60)
@@ -60,7 +59,6 @@ export default function Dashboard() {
     return `${minutes}m`
   }
 
-  // Format simple date
   const formatDate = (timestamp: number) => {
     return new Date(timestamp).toLocaleDateString(undefined, {
       month: 'short',
@@ -71,30 +69,23 @@ export default function Dashboard() {
   }
 
   if (loading) {
-    return <LoadingState label="Loading dashboard metrics…" />
+    return <LoadingState label="Loading dashboard metrics?" />
   }
 
   if (hasError) {
     return (
-      <Card className="p-8 max-w-md mx-auto text-center space-y-6">
-        <div className="inline-flex p-3 bg-danger-bg rounded-full text-danger-text">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-text-main">Database Connection Error</h2>
-          <p className="text-sm text-text-muted">We encountered an issue reading your quiz history from the database.</p>
-          <p className="text-xs text-text-muted mt-2">Refresh the page and try again. TurboQuiz stores its data locally in this browser.</p>
-        </div>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="primary"
-          className="w-full"
-        >
+      <div className="mx-auto max-w-lg space-y-6 py-8">
+        <Alert variant="danger">
+          <div className="space-y-2">
+            <p className="font-semibold text-danger-text">Database Connection Error</p>
+            <p>We encountered an issue reading your quiz history from the database.</p>
+            <p className="text-xs opacity-90">Refresh the page and try again. TurboQuiz stores its data locally in this browser.</p>
+          </div>
+        </Alert>
+        <Button onClick={() => window.location.reload()} variant="primary" className="w-full sm:w-auto">
           Reload Dashboard
         </Button>
-      </Card>
+      </div>
     )
   }
 
@@ -102,7 +93,7 @@ export default function Dashboard() {
   const recentAttempts = attempts.slice(0, 5)
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
+    <div className="mx-auto max-w-5xl space-y-10">
       <PageHeader
         title="Dashboard"
         description="Track your overall performance, strengths, and subject-level proficiency."
@@ -121,7 +112,7 @@ export default function Dashboard() {
             : 'Your subjects are ready. Complete a quiz to unlock accuracy, time, and proficiency insights.'}
           icon={
             <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
           }
           action={
@@ -135,38 +126,35 @@ export default function Dashboard() {
         />
       ) : (
         <>
-          {/* Stats Deck Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <Card className="p-5 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted block">Completed Quizzes</span>
-              <span className="text-3xl font-bold text-text-main">{metrics.totalAttempts}</span>
-            </Card>
+          <section aria-label="Study summary">
+            <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-border-subtle bg-border-subtle sm:grid-cols-4">
+              <div className="bg-surface-raised px-4 py-4 sm:px-5">
+                <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Completed Quizzes</dt>
+                <dd className="mt-1 font-serif text-2xl font-semibold text-text-main">{metrics.totalAttempts}</dd>
+              </div>
+              <div className="bg-surface-raised px-4 py-4 sm:px-5">
+                <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Overall Accuracy</dt>
+                <dd className="mt-1 font-serif text-2xl font-semibold text-primary-text">{metrics.overallAccuracy}%</dd>
+                <dd className="mt-0.5 text-xs text-text-muted">
+                  {metrics.totalCorrect} / {metrics.totalQuestionsPresented} Questions Included
+                </dd>
+              </div>
+              <div className="bg-surface-raised px-4 py-4 sm:px-5">
+                <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Total Questions Included</dt>
+                <dd className="mt-1 font-serif text-2xl font-semibold text-text-main">{metrics.totalQuestionsPresented}</dd>
+              </div>
+              <div className="bg-surface-raised px-4 py-4 sm:px-5">
+                <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Total Time Spent</dt>
+                <dd className="mt-1 font-serif text-2xl font-semibold text-text-main">{formatTotalTime(metrics.totalTimeSpentSeconds)}</dd>
+              </div>
+            </dl>
+          </section>
 
-            <Card className="p-5 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted block">Overall Accuracy</span>
-              <span className="text-3xl font-bold text-primary-text">{metrics.overallAccuracy}%</span>
-              <span className="text-[10px] text-text-muted block">
-                {metrics.totalCorrect} / {metrics.totalQuestionsPresented} Questions Included
-              </span>
-            </Card>
-
-            <Card className="p-5 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted block">Total Questions Included</span>
-              <span className="text-3xl font-bold text-text-main">{metrics.totalQuestionsPresented}</span>
-            </Card>
-
-            <Card className="p-5 space-y-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-text-muted block">Total Time Spent</span>
-              <span className="text-3xl font-bold text-text-main">{formatTotalTime(metrics.totalTimeSpentSeconds)}</span>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Subject Level proficiency list */}
-            <Card className="p-6 space-y-6 lg:col-span-2">
-              <h2 className="text-lg font-bold text-text-main">Subject Proficiency</h2>
-              <div className="space-y-4">
-                {Object.values(metrics.subjectPerformance).map((subMetric, idx) => {
+          <div className="grid grid-cols-1 gap-10 lg:grid-cols-5">
+            <section className="space-y-4 lg:col-span-3">
+              <h2 className="text-base font-semibold text-text-main">Subject Proficiency</h2>
+              <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+                {Object.values(metrics.subjectPerformance).map((subMetric) => {
                   const acc = subMetric.accuracyPercentage
                   let accBarColor = 'bg-danger-text'
                   let accTextColor = 'text-danger-text'
@@ -179,130 +167,99 @@ export default function Dashboard() {
                   }
 
                   return (
-                    <div key={idx} className="space-y-2">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-semibold text-text-main">{subMetric.subjectName}</span>
-                        <div className="flex items-center gap-2">
+                    <li key={subMetric.subjectName} className="space-y-2 py-4">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-medium text-text-main">{subMetric.subjectName}</span>
+                        <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs text-text-muted">({subMetric.attemptsCount} attempts)</span>
-                          <span className={`font-bold ${accTextColor}`}>{acc}%</span>
+                          <span className={`font-semibold ${accTextColor}`}>{acc}%</span>
                         </div>
                       </div>
-                      <div className="w-full bg-surface-base h-2.5 rounded-full overflow-hidden border border-border-subtle">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-overlay">
                         <div
-                          className={`h-full rounded-full transition-all duration-500 ${accBarColor}`}
+                          className={`h-full rounded-full ${accBarColor}`}
                           style={{ width: `${acc}%` }}
                         />
                       </div>
-                    </div>
+                    </li>
                   )
                 })}
-              </div>
-            </Card>
+              </ul>
+            </section>
 
-            {/* Mode comparisons */}
-            <Card className="p-6 space-y-6">
-              <h2 className="text-lg font-bold text-text-main">Modes Breakdown</h2>
-              <div className="space-y-4">
-                {/* Practice Mode Card */}
-                <div className="bg-surface-raised p-4 rounded-xl border border-border-subtle flex justify-between items-center">
-                  <div className="space-y-1">
-                    <span className="text-sm font-bold text-text-main">Practice</span>
-                    <span className="text-xs text-text-muted block">
-                      {metrics.practiceStats.attemptsCount} completions
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xl font-bold text-text-main block">
-                      {metrics.practiceStats.attemptsCount > 0 ? `${metrics.practiceStats.accuracyPercentage}%` : '-'}
-                    </span>
-                    <span className="text-[10px] text-text-muted block">Accuracy</span>
-                  </div>
-                </div>
-
-                {/* Exam Mode Card */}
-                <div className="bg-surface-raised p-4 rounded-xl border border-border-subtle flex justify-between items-center">
-                  <div className="space-y-1">
-                    <span className="text-sm font-bold text-text-main">Exam</span>
-                    <span className="text-xs text-text-muted block">
-                      {metrics.examStats.attemptsCount} completions
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xl font-bold text-text-main block">
-                      {metrics.examStats.attemptsCount > 0 ? `${metrics.examStats.accuracyPercentage}%` : '-'}
-                    </span>
-                    <span className="text-[10px] text-text-muted block">Accuracy</span>
-                  </div>
-                </div>
-                {/* Mistakes Mode Card */}
-                <div className="bg-surface-raised p-4 rounded-xl border border-border-subtle flex justify-between items-center">
-                  <div className="space-y-1">
-                    <span className="text-sm font-bold text-text-main">Mistakes</span>
-                    <span className="text-xs text-text-muted block">
-                      {metrics.mistakesStats.attemptsCount} completions
-                    </span>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xl font-bold text-text-main block">
-                      {metrics.mistakesStats.attemptsCount > 0 ? `${metrics.mistakesStats.accuracyPercentage}%` : '-'}
-                    </span>
-                    <span className="text-[10px] text-text-muted block">Accuracy</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
+            <section className="space-y-4 lg:col-span-2">
+              <h2 className="text-base font-semibold text-text-main">Modes Breakdown</h2>
+              <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+                {[
+                  { label: 'Practice', stats: metrics.practiceStats },
+                  { label: 'Exam', stats: metrics.examStats },
+                  { label: 'Mistakes', stats: metrics.mistakesStats },
+                ].map((mode) => (
+                  <li key={mode.label} className="flex items-center justify-between gap-4 py-3.5">
+                    <div>
+                      <p className="text-sm font-medium text-text-main">{mode.label}</p>
+                      <p className="text-xs text-text-muted">
+                        {mode.stats.attemptsCount} completions
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-semibold text-text-main">
+                        {mode.stats.attemptsCount > 0 ? `${mode.stats.accuracyPercentage}%` : '-'}
+                      </p>
+                      <p className="text-xs text-text-muted">Accuracy</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
           </div>
 
-          {/* Recent attempts */}
-          <Card className="p-6 space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-lg font-bold text-text-main">Recent Attempts</h2>
+          <section className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-base font-semibold text-text-main">Recent Attempts</h2>
               <Link
                 to="/history"
-                className="text-xs font-bold text-primary-text hover:text-primary-hover transition-colors flex items-center gap-1 focus:outline-none focus:underline"
+                className="inline-flex min-h-9 items-center text-sm font-medium text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:underline"
               >
                 View Full History
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
               </Link>
             </div>
 
-            <div className="divide-y divide-border-subtle">
+            <ul className="divide-y divide-border-subtle border-t border-border-subtle">
               {recentAttempts.map((attempt) => (
-                <div key={attempt.id} className="py-4 first:pt-0 last:pb-0 flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                  <div>
-                    <h3 className="font-semibold text-text-main">{attempt.subjectNameSnap || 'Deleted Subject'}</h3>
-                    <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted mt-1">
+                <li key={attempt.id} className="flex flex-col gap-3 py-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="font-medium text-text-main">{attempt.subjectNameSnap || 'Deleted Subject'}</h3>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
                       <span className="capitalize">{attempt.mode}</span>
-                      <span>•</span>
+                      <span aria-hidden="true">?</span>
                       <span>{formatDate(attempt.completedAt)}</span>
-                      {attempt.topicNameSnap && (
+                      {attempt.topicNameSnap ? (
                         <>
-                          <span>•</span>
+                          <span aria-hidden="true">?</span>
                           <span>{attempt.topicNameSnap}</span>
                         </>
-                      )}
-                    </div>
+                      ) : null}
+                    </p>
                   </div>
-                  <div className="flex items-center justify-between sm:justify-end gap-6">
+                  <div className="flex items-center justify-between gap-4 sm:justify-end">
                     <div className="text-left sm:text-right">
-                      <span className="font-bold text-text-main block">
+                      <p className="font-semibold text-text-main">
                         {attempt.correctAnswers} / {attempt.totalQuestions}
-                      </span>
-                      <span className="text-xs text-text-muted block">{attempt.scorePercentage}% Score</span>
+                      </p>
+                      <p className="text-xs text-text-muted">{attempt.scorePercentage}% Score</p>
                     </div>
                     <Link
                       to={`/quiz/results/${attempt.id}`}
-                      className="inline-flex min-h-11 items-center px-3.5 py-1.5 bg-surface-overlay hover:bg-border-strong text-text-main font-bold rounded-xl text-xs transition-colors border border-border-strong cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base"
+                      className={buttonStyles({ variant: 'secondary', size: 'sm' })}
                     >
                       Review
                     </Link>
                   </div>
-                </div>
+                </li>
               ))}
-            </div>
-          </Card>
+            </ul>
+          </section>
         </>
       )}
     </div>

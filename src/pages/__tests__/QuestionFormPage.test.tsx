@@ -53,7 +53,7 @@ describe('QuestionFormPage', () => {
     })
 
     await waitFor(() => {
-      const subjectSelect = screen.getByLabelText(/Subject \*/i) as HTMLSelectElement
+      const subjectSelect = screen.getByLabelText(/^Subject/i) as HTMLSelectElement
       expect(subjectSelect.value).toBe(sub.id.toString())
 
       const topicSelect = screen.getByLabelText(/Topic/i) as HTMLSelectElement

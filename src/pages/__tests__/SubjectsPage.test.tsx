@@ -98,7 +98,7 @@ describe('SubjectsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Edit/i }))
 
-    const editInput = await screen.findByLabelText('Subject Name')
+    const editInput = await screen.findByRole('textbox', { name: /^Subject Name/ })
     fireEvent.change(editInput, { target: { value: 'New Name' } })
 
     fireEvent.click(screen.getByRole('button', { name: /Save/i }))
@@ -127,7 +127,7 @@ describe('SubjectsPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Edit/i }))
 
-    const editInput = await screen.findByLabelText('Subject Name')
+    const editInput = await screen.findByRole('textbox', { name: /^Subject Name/ })
     fireEvent.change(editInput, { target: { value: 'Changed' } })
 
     fireEvent.click(screen.getByRole('button', { name: /Cancel/i }))

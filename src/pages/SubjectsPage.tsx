@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useForm } from 'react-hook-form'
@@ -12,19 +12,19 @@ import { subjectCreateSchema, subjectUpdateSchema } from '../schemas/subjectSche
 import { DuplicateNameError, ValidationError } from '../db/errors'
 import type { Subject } from '../types/db'
 
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { Alert } from '../components/ui/Alert'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { PageHeader } from '../components/ui/PageHeader'
+import { Field } from '../components/ui/Field'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 
 const subjectRepo = new SubjectRepository(db)
 const topicRepo = new TopicRepository(db)
 const questionRepo = new QuestionRepository(db)
 
-// Define inline create form schema (same as create)
 type CreateFormData = z.infer<typeof subjectCreateSchema>
 type UpdateFormData = z.infer<typeof subjectUpdateSchema>
 
@@ -34,11 +34,8 @@ export default function SubjectsPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [isSubmittingAction, setIsSubmittingAction] = useState(false)
 
-  const cancelRef = useRef<HTMLButtonElement>(null)
-
   const subjects = useLiveQuery(() => subjectRepo.getAll())
 
-  // To display counts efficiently, we run the counts for each subject.
   const subjectStats = useLiveQuery(async () => {
     if (!subjects) return {}
     const stats: Record<number, { topics: number; questions: number }> = {}
@@ -56,7 +53,7 @@ export default function SubjectsPage() {
     reset: resetCreate,
     formState: { errors: createErrors, isSubmitting: isCreating }
   } = useForm<z.input<typeof subjectCreateSchema>, unknown, CreateFormData>({
-    resolver: zodResolver(subjectCreateSchema) ,
+    resolver: zodResolver(subjectCreateSchema),
     defaultValues: { name: '' }
   })
 
@@ -80,13 +77,12 @@ export default function SubjectsPage() {
       })
       resetCreate()
     } catch (err) {
-      const setActionErr = setActionError;
       if (err instanceof DuplicateNameError) {
-        setActionErr(`A subject named "${err.conflictingValue}" already exists.`)
+        setActionError(`A subject named "${err.conflictingValue}" already exists.`)
       } else if (err instanceof ValidationError) {
-        setActionErr('Validation error occurred.')
+        setActionError('Validation error occurred.')
       } else {
-        setActionErr(err instanceof Error ? err.message : String(err))
+        setActionError(err instanceof Error ? err.message : String(err))
       }
     }
   }
@@ -121,15 +117,10 @@ export default function SubjectsPage() {
     }
   }
 
-  const confirmDelete = (id: number) => {
-    setActionError(null)
-    setDeletingId(id)
-  }
-
-  const cancelDelete = () => {
-    setDeletingId(null)
-    setActionError(null)
-  }
+  const deletingSubject = subjects?.find((sub) => sub.id === deletingId) ?? null
+  const deletingStats = deletingId != null
+    ? (subjectStats?.[deletingId] || { topics: 0, questions: 0 })
+    : { topics: 0, questions: 0 }
 
   const executeDelete = async () => {
     if (deletingId === null) return
@@ -145,16 +136,10 @@ export default function SubjectsPage() {
     }
   }
 
-  useEffect(() => {
-    if (deletingId !== null && cancelRef.current) {
-      cancelRef.current.focus()
-    }
-  }, [deletingId])
-
   const isLoading = subjects === undefined
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         title="Subjects"
         description="Organize your study library, then add topics and questions inside each subject."
@@ -166,37 +151,31 @@ export default function SubjectsPage() {
         </Alert>
       )}
 
-      {/* Create Form */}
-      <Card className="p-4">
-        <form onSubmit={handleCreateSubmit(onCreate)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-          <div className="flex-1 w-full">
-            <label htmlFor="create-name" className="block text-sm font-medium text-text-main mb-1">
-              New Subject Name
-            </label>
-            <Input
+      <section className="rounded-lg border border-border-subtle bg-surface-raised p-4 sm:p-5" aria-labelledby="create-subject-heading">
+        <h2 id="create-subject-heading" className="text-sm font-semibold text-text-main">Add a subject</h2>
+        <form onSubmit={handleCreateSubmit(onCreate)} className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0 flex-1">
+            <Field
               id="create-name"
-              {...registerCreate('name')}
-              hasError={!!createErrors.name}
-              placeholder="e.g. Mathematics"
-            />
-            {createErrors.name && (
-              <p className="text-danger-text text-xs mt-1">{createErrors.name.message}</p>
-            )}
+              label="New Subject Name"
+              required
+              error={createErrors.name?.message}
+            >
+              <Input
+                {...registerCreate('name')}
+                placeholder="e.g. Mathematics"
+              />
+            </Field>
           </div>
-          <Button
-            type="submit"
-            disabled={isCreating}
-            className="w-full sm:w-auto"
-          >
+          <Button type="submit" disabled={isCreating} className="w-full sm:w-auto">
             {isCreating ? 'Creating...' : 'Create Subject'}
           </Button>
         </form>
-      </Card>
+      </section>
 
-      {/* List */}
-      <div className="space-y-4">
+      <section aria-label="Subject list">
         {isLoading ? (
-          <LoadingState compact label="Loading subjects…" />
+          <LoadingState compact label="Loading subjects?" />
         ) : subjects.length === 0 ? (
           <EmptyState
             title="No subjects found"
@@ -208,138 +187,99 @@ export default function SubjectsPage() {
             }
           />
         ) : (
-          subjects.map((sub) => {
-            const isEditingThis = editingId === sub.id
-            const isDeletingThis = deletingId === sub.id
-            const stats = subjectStats?.[sub.id] || { topics: 0, questions: 0 }
+          <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+            {subjects.map((sub) => {
+              const isEditingThis = editingId === sub.id
+              const stats = subjectStats?.[sub.id] || { topics: 0, questions: 0 }
 
-            return (
-              <Card key={sub.id} className="p-4 sm:p-6 transition-all hover:border-border-strong">
-                {isDeletingThis ? (
-                  <div
-                    role="dialog"
-                    aria-modal="true"
-                    className="space-y-4 focus:outline-none"
-                    aria-labelledby={`delete-heading-${sub.id}`}
-                    tabIndex={-1}
-                  >
-                    <div className="space-y-2">
-                      <h3 id={`delete-heading-${sub.id}`} className="text-lg font-bold text-text-main">
-                        Delete Subject: {sub.name}
-                      </h3>
-                      <p className="text-sm text-text-muted">
-                        Are you sure you want to delete this subject?
-                        <span className="block text-danger-text font-semibold mt-1">
-                          This will permanently delete {stats.topics} topic(s) and {stats.questions} question(s). Historical quiz snapshots will be preserved.
-                        </span>
-                      </p>
-                    </div>
-                    <div className="flex gap-3 justify-end">
-                      <Button
-                        ref={cancelRef}
-                        type="button"
-                        onClick={cancelDelete}
-                        disabled={isSubmittingAction}
-                        variant="secondary"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={executeDelete}
-                        disabled={isSubmittingAction}
-                        variant="danger"
-                      >
-                        {isSubmittingAction ? 'Deleting...' : 'Confirm Delete'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : isEditingThis ? (
-                  <form onSubmit={handleEditSubmit(onEdit)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-                    <div className="flex-1 w-full">
-                      <label htmlFor={`edit-name-${sub.id}`} className="sr-only">Subject Name</label>
-                      <Input
-                        id={`edit-name-${sub.id}`}
-                        {...registerEdit('name')}
-                        hasError={!!editErrors.name}
-                        autoFocus
-                      />
-                      {editErrors.name && (
-                        <p className="text-danger-text text-xs mt-1">{editErrors.name.message}</p>
-                      )}
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <Button
-                        type="button"
-                        onClick={cancelEditing}
-                        disabled={isEditing}
-                        variant="secondary"
-                        className="flex-1 sm:flex-none"
-                      >
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={isEditing}
-                        variant="primary"
-                        className="flex-1 sm:flex-none"
-                      >
-                        {isEditing ? 'Saving...' : 'Save'}
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div className="flex-1">
-                      <Link to={`/subjects/${sub.id}`} className="group">
-                        <h2 className="text-xl font-bold text-text-main group-hover:text-primary-text transition-colors flex items-center gap-2">
-                          {sub.name}
-                          <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              return (
+                <li key={sub.id} className="py-4">
+                  {isEditingThis ? (
+                    <form onSubmit={handleEditSubmit(onEdit)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                      <div className="min-w-0 flex-1">
+                        <Field
+                          id={`edit-name-${sub.id}`}
+                          label="Subject Name"
+                          required
+                          error={editErrors.name?.message}
+                        >
+                          <Input
+                            {...registerEdit('name')}
+                            autoFocus
+                          />
+                        </Field>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button type="button" onClick={cancelEditing} disabled={isEditing} variant="secondary">
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isEditing} variant="primary">
+                          {isEditing ? 'Saving...' : 'Save'}
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <Link
+                          to={`/subjects/${sub.id}`}
+                          className="group inline-flex max-w-full items-center gap-1.5 rounded-sm text-lg font-semibold text-text-main transition-colors hover:text-primary-text focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
+                        >
+                          <span className="truncate">{sub.name}</span>
+                          <svg className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                           </svg>
-                        </h2>
-                      </Link>
-                      <div className="flex items-center gap-4 mt-2 text-xs font-medium text-text-muted">
-                        <span className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                          </svg>
-                          {stats.topics} Topics
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {stats.questions} Questions
-                        </span>
+                        </Link>
+                        <p className="mt-1 text-sm text-text-muted">
+                          {stats.topics} Topics · {stats.questions} Questions
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" onClick={() => startEditing(sub)} variant="secondary" size="sm">
+                          Edit
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setActionError(null)
+                            setDeletingId(sub.id)
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
+                        >
+                          Delete
+                        </Button>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        onClick={() => startEditing(sub)}
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={() => confirmDelete(sub.id)}
-                        variant="ghost"
-                        size="sm"
-                        className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            )
-          })
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         )}
-      </div>
+      </section>
+
+      <ConfirmDialog
+        open={deletingId !== null}
+        title={deletingSubject ? `Delete Subject: ${deletingSubject.name}` : 'Delete Subject'}
+        description={
+          <>
+            <p>Are you sure you want to delete this subject?</p>
+            <p className="mt-2 font-semibold text-danger-text">
+              This will permanently delete {deletingStats.topics} topic(s) and {deletingStats.questions} question(s). Historical quiz snapshots will be preserved.
+            </p>
+          </>
+        }
+        confirmLabel="Confirm Delete"
+        tone="destructive"
+        pending={isSubmittingAction}
+        onConfirm={executeDelete}
+        onCancel={() => {
+          setDeletingId(null)
+          setActionError(null)
+        }}
+      />
     </div>
   )
 }
