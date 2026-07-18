@@ -239,5 +239,13 @@ describe('Dashboard', () => {
     expect(screen.getAllByText('Subject Attempt 2')[0]).toBeInTheDocument()
     expect(screen.getAllByText('Subject Attempt 1')[0]).toBeInTheDocument()
     expect(screen.queryByText('Subject Attempt 0')).not.toBeInTheDocument()
+
+    const metadataSeparators = [...document.querySelectorAll('[aria-hidden="true"]')].filter(
+      (el) => el.textContent?.includes('\u00B7'),
+    )
+    expect(metadataSeparators.length).toBeGreaterThanOrEqual(5)
+    expect(
+      [...document.querySelectorAll('[aria-hidden="true"]')].some((el) => el.textContent === '?'),
+    ).toBe(false)
   })
 })

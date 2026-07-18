@@ -69,7 +69,7 @@ export default function Dashboard() {
   }
 
   if (loading) {
-    return <LoadingState label="Loading dashboard metrics?" />
+    return <LoadingState label="Loading dashboard metrics…" />
   }
 
   if (hasError) {
@@ -232,11 +232,11 @@ export default function Dashboard() {
                     <h3 className="font-medium text-text-main">{attempt.subjectNameSnap || 'Deleted Subject'}</h3>
                     <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
                       <span className="capitalize">{attempt.mode}</span>
-                      <span aria-hidden="true">?</span>
+                      <span aria-hidden="true"> · </span>
                       <span>{formatDate(attempt.completedAt)}</span>
                       {attempt.topicNameSnap ? (
                         <>
-                          <span aria-hidden="true">?</span>
+                          <span aria-hidden="true"> · </span>
                           <span>{attempt.topicNameSnap}</span>
                         </>
                       ) : null}

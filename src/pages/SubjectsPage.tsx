@@ -175,7 +175,7 @@ export default function SubjectsPage() {
 
       <section aria-label="Subject list">
         {isLoading ? (
-          <LoadingState compact label="Loading subjects?" />
+          <LoadingState compact label="Loading subjects…" />
         ) : subjects.length === 0 ? (
           <EmptyState
             title="No subjects found"

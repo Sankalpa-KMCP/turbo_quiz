@@ -90,7 +90,7 @@ export default function QuestionsPage() {
 
   if (!isValidSubjectId) {
     if (allSubjects === undefined) {
-      return <LoadingState label="Loading subjects?" />
+      return <LoadingState label="Loading subjects…" />
     }
 
     if (allSubjects.length === 0) {
@@ -146,7 +146,7 @@ export default function QuestionsPage() {
   }
 
   if (subject === undefined) {
-    return <LoadingState label="Loading question bank?" />
+    return <LoadingState label="Loading question bank…" />
   }
 
   if (subject === null) {
@@ -253,7 +253,7 @@ export default function QuestionsPage() {
       </section>
 
       {questions === undefined ? (
-        <LoadingState compact label="Loading questions?" />
+        <LoadingState compact label="Loading questions…" />
       ) : questions.length === 0 ? (
         <EmptyState
           title="No questions match your filters."
