@@ -1,4 +1,6 @@
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { Button } from '../ui/Button'
+import { Card } from '../ui/Card'
 
 export function ReloadPrompt() {
   const {
@@ -22,30 +24,31 @@ export function ReloadPrompt() {
   if (!offlineReady && !needRefresh) return null
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 p-4 bg-slate-800 border border-slate-700 shadow-xl rounded-2xl max-w-sm w-full transition-all" role="alert" aria-live="assertive">
+    <Card className="fixed inset-x-4 bottom-4 z-50 p-4 shadow-xl sm:left-auto sm:right-4 sm:max-w-sm" role="alert" aria-live="assertive">
       <div className="flex flex-col gap-3">
-        <div className="text-sm font-medium text-slate-200">
+        <div className="text-sm font-medium text-text-main">
           {offlineReady
             ? <span>App ready to work offline</span>
             : <span>New content available, click on reload button to update.</span>}
         </div>
         <div className="flex justify-end gap-2">
           {needRefresh && (
-            <button
+            <Button
               onClick={() => updateServiceWorker(true)}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-slate-100 rounded-lg text-sm font-bold transition-colors"
+              size="sm"
             >
               Reload
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             onClick={close}
-            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-bold transition-colors"
+            variant="secondary"
+            size="sm"
           >
             Close
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Card>
   )
 }
