@@ -41,7 +41,7 @@ describe('Dashboard', () => {
     vi.restoreAllMocks()
   })
 
-  it('renders overall empty state when no attempts exist', async () => {
+  it('guides a new user to create their first subject', async () => {
     render(
       <MemoryRouter>
         <Dashboard />
@@ -49,8 +49,23 @@ describe('Dashboard', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText(/No Analytics Yet/i)).toBeInTheDocument()
-      expect(screen.getByRole('link', { name: /Start Your First Quiz/i })).toBeInTheDocument()
+      expect(screen.getByText(/Build your study library/i)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Create your first subject/i })).toHaveAttribute('href', '/subjects')
+    })
+  })
+
+  it('guides users with a subject to their first quiz', async () => {
+    await subjectRepo.create({ name: 'Mathematics', description: null })
+
+    render(
+      <MemoryRouter>
+        <Dashboard />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Ready for your first quiz/i)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Start your first quiz/i })).toHaveAttribute('href', '/quiz/setup')
     })
   })
 

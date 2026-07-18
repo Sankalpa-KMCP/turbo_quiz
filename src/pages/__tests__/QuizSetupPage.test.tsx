@@ -29,6 +29,19 @@ describe('QuizSetupPage', () => {
     await db.answerAttempts.clear()
   })
 
+  it('guides an empty library to create a subject', async () => {
+    render(
+      <MemoryRouter>
+        <QuizSetupPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText(/Create a subject before starting/i)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /Create a subject/i })).toHaveAttribute('href', '/subjects')
+    })
+  })
+
   it('loads subjects and handles dependent topic loading & resets', async () => {
     const s1 = await subjectRepo.create({ name: 'Subject 1', description: null })
     const s2 = await subjectRepo.create({ name: 'Subject 2', description: null })

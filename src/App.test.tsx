@@ -36,7 +36,7 @@ describe('App Shell and Routing', () => {
     fireEvent.click(subjectsLinks[0])
 
     expect(await screen.findByRole('heading', { name: /Subjects/i })).toBeInTheDocument()
-    expect(screen.getByText(/Manage the subjects you want to practice/i)).toBeInTheDocument()
+    expect(screen.getByText(/Organize your study library/i)).toBeInTheDocument()
   })
 
   it('renders dynamic subject route parameters safely', async () => {

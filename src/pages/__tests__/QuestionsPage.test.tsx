@@ -34,9 +34,10 @@ describe('QuestionsPage', () => {
     await db.questions.clear()
   })
 
-  it('handles missing subjectId param', () => {
+  it('guides users without a subject selection', () => {
     renderWithRouter('/questions')
-    expect(screen.getByText('Invalid Subject ID')).toBeInTheDocument()
+    expect(screen.getByText('Choose a subject first')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Browse subjects/i })).toHaveAttribute('href', '/subjects')
   })
 
   it('handles not found subject', async () => {

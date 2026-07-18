@@ -52,7 +52,7 @@ describe('HistoryPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/No Past Attempts/i)).toBeInTheDocument()
-      expect(screen.queryByLabelText(/Filter by Subject:/i)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/^Subject$/i)).not.toBeInTheDocument()
     })
   })
 
@@ -162,7 +162,7 @@ describe('HistoryPage', () => {
       expect(screen.getAllByText('Physics').length).toBeGreaterThan(1)
     })
 
-    const filter = screen.getByLabelText(/Filter by Subject:/i)
+    const filter = screen.getByLabelText(/^Subject$/i)
     fireEvent.change(filter, { target: { value: String(sub1.id) } })
 
     // Physics should be filtered out (count === 1 for dropdown only)
@@ -204,7 +204,7 @@ describe('HistoryPage', () => {
       expect(screen.getAllByText('Biology').length).toBeGreaterThan(1)
     })
 
-    const filter = screen.getByLabelText(/Filter by Subject:/i)
+    const filter = screen.getByLabelText(/^Subject$/i)
     fireEvent.change(filter, { target: { value: String(sub2.id) } })
 
     await waitFor(() => {
