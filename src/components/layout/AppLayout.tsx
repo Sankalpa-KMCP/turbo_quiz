@@ -233,7 +233,7 @@ export default function AppLayout() {
 
         <main
           id="main-content"
-          className="mx-auto w-full max-w-3xl px-4 py-6 sm:px-6 sm:py-8 outline-none"
+          className="mx-auto w-full max-w-3xl px-4 py-6 pb-24 sm:px-6 sm:py-8 sm:pb-8 outline-none"
           tabIndex={-1}
         >
           <Suspense fallback={<PageSuspenseFallback />}>
@@ -407,7 +407,7 @@ export default function AppLayout() {
 
       <main
         id="main-content"
-        className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 xl:p-12 outline-none"
+        className="flex-1 w-full max-w-7xl mx-auto p-4 pb-24 sm:p-6 sm:pb-6 lg:p-10 lg:pb-10 xl:p-12 xl:pb-12 outline-none"
         tabIndex={-1}
       >
         <Suspense fallback={<PageSuspenseFallback />}>

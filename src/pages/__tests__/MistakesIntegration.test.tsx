@@ -94,7 +94,10 @@ describe('Mistakes Integration', () => {
     fireEvent.change(quizSubSelect, { target: { value: String(sub.id) } })
 
     const quizTopicSelect = screen.getByLabelText(/Topic/i)
-    await waitFor(() => expect(quizTopicSelect).not.toBeDisabled())
+    await waitFor(() => {
+      expect(quizTopicSelect).not.toBeDisabled()
+      expect(screen.getByRole('option', { name: 'Capitals' })).toBeInTheDocument()
+    })
     fireEvent.change(quizTopicSelect, { target: { value: String(topic.id) } })
 
     await waitFor(() => expect(screen.getByText(/Available questions:/)).toHaveTextContent('2'))
@@ -134,11 +137,13 @@ describe('Mistakes Integration', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/mistakes'))
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Mistakes & Weaknesses' })).toBeInTheDocument())
 
-    // 4. Verify the active mistake is rendered
-    expect(screen.getByText('1 Active Mistake')).toBeInTheDocument()
-    expect(screen.getByText('Geography')).toBeInTheDocument()
-    expect(screen.getByText('No specific topic')).toBeInTheDocument()
-    expect(screen.getByText('Capital of France?')).toBeInTheDocument()
+    // 4. Verify the active mistake is rendered (await async load; use shuffled q1 text)
+    await waitFor(() => {
+      expect(screen.getByText('1 Active Mistake')).toBeInTheDocument()
+      expect(screen.getByText('Geography')).toBeInTheDocument()
+      expect(screen.getByText('Capitals')).toBeInTheDocument()
+    })
+    expect(await screen.findByText(q1Text)).toBeInTheDocument()
 
     // 5. Start a retry session
     fireEvent.click(screen.getByRole('button', { name: /Retry Group/i }))

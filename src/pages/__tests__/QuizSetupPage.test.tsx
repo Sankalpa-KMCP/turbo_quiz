@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { db } from '../../db/database'
 import { SubjectRepository } from '../../db/repositories/SubjectRepository'
@@ -27,6 +27,7 @@ describe('QuizSetupPage', () => {
     await db.questions.clear()
     await db.quizAttempts.clear()
     await db.answerAttempts.clear()
+    vi.restoreAllMocks()
   })
 
   it('guides an empty library to create a subject', async () => {
@@ -88,6 +89,42 @@ describe('QuizSetupPage', () => {
       expect(screen.queryByRole('option', { name: 'Topic 1-1' })).not.toBeInTheDocument()
       expect(screen.getByRole('option', { name: 'Topic 2-1' })).toBeInTheDocument()
     })
+  })
+
+  it('shows unresolved eligibility instead of a false zero while counts load', async () => {
+    const s1 = await subjectRepo.create({ name: 'Physics', description: null })
+
+    let resolveCount!: (value: number) => void
+    const deferredCount = new Promise<number>((resolve) => {
+      resolveCount = resolve
+    })
+    vi.spyOn(QuestionRepository.prototype, 'countBySubject').mockReturnValue(deferredCount)
+
+    render(
+      <MemoryRouter>
+        <QuizSetupPage />
+      </MemoryRouter>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: 'Physics' })).toBeInTheDocument()
+    })
+    fireEvent.change(screen.getByLabelText(/Subject/i), { target: { value: s1.id.toString() } })
+
+    await waitFor(() => {
+      expect(screen.getByText(/Checking available questions/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/Available questions:\s*0/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/no questions yet/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Start Quiz/i })).toBeDisabled()
+
+    resolveCount(0)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Available questions:/i)).toHaveTextContent('Available questions: 0')
+    })
+    expect(screen.getByText(/no questions yet/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Start Quiz/i })).toBeDisabled()
   })
 
   it('displays eligible questions and disables impossible counts', async () => {

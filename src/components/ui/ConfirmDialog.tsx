@@ -159,7 +159,7 @@ export function ConfirmDialog({
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         className={cn(
-          'relative z-10 w-full max-w-md rounded-lg border border-border-subtle bg-surface-raised p-5 shadow-lg outline-none sm:p-6',
+          'relative z-10 w-full max-w-md max-h-[min(90dvh,40rem)] overflow-y-auto rounded-lg border border-border-subtle bg-surface-raised p-5 shadow-lg outline-none sm:p-6',
           className
         )}
       >

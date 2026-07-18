@@ -42,21 +42,36 @@ export default function QuizSetupPage() {
   const subjectsQuery = useLiveQuery(() => subjectRepo.getAll())
   const subjects = subjectsQuery || []
 
-  const topics = useLiveQuery(
+  const topicsQuery = useLiveQuery(
     () => (selectedSubjectId ? topicRepo.getBySubject(selectedSubjectId) : Promise.resolve([])),
     [selectedSubjectId],
-  ) || []
+  )
+  const topics = topicsQuery ?? []
 
-  const eligibleCount = useLiveQuery(
+  const eligibilitySelectionKey = selectedSubjectId
+    ? `${selectedSubjectId}:${selectedTopicId ?? 'all'}`
+    : 'none'
+
+  const eligibleCountQuery = useLiveQuery(
     async () => {
-      if (!selectedSubjectId) return 0
-      if (selectedTopicId !== null) {
-        return await questionRepo.countByTopic(selectedTopicId)
+      if (!selectedSubjectId) {
+        return { key: 'none' as const, count: 0 }
       }
-      return await questionRepo.countBySubject(selectedSubjectId)
+      const count = selectedTopicId !== null
+        ? await questionRepo.countByTopic(selectedTopicId)
+        : await questionRepo.countBySubject(selectedSubjectId)
+      return {
+        key: `${selectedSubjectId}:${selectedTopicId ?? 'all'}`,
+        count,
+      }
     },
     [selectedSubjectId, selectedTopicId],
-  ) ?? 0
+  )
+
+  const eligibleCountResolved =
+    eligibleCountQuery !== undefined && eligibleCountQuery.key === eligibilitySelectionKey
+  const eligibleCountPending = Boolean(selectedSubjectId) && !eligibleCountResolved
+  const eligibleCount = eligibleCountResolved ? eligibleCountQuery.count : 0
 
   const activeQuestionCount =
     questionCount !== 'all' && eligibleCount > 0 && questionCount > eligibleCount
@@ -70,6 +85,9 @@ export default function QuizSetupPage() {
     e.preventDefault()
     if (!selectedSubjectId) {
       setErrorMsg('Please select a subject')
+      return
+    }
+    if (eligibleCountPending) {
       return
     }
     if (eligibleCount === 0) {
@@ -262,19 +280,26 @@ export default function QuizSetupPage() {
               id="count-select"
               label="Number of Questions"
               helperText={
-                selectedSubjectId
-                  ? `Up to ${eligibleCount} eligible question${eligibleCount === 1 ? '' : 's'} for this selection.`
-                  : undefined
+                !selectedSubjectId
+                  ? undefined
+                  : eligibleCountPending
+                    ? 'Checking how many questions are available for this selection…'
+                    : `Up to ${eligibleCount} eligible question${eligibleCount === 1 ? '' : 's'} for this selection.`
               }
             >
               <Select
                 value={activeQuestionCount}
                 onChange={(e) => setQuestionCount(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                disabled={!selectedSubjectId || eligibleCount === 0}
+                disabled={!selectedSubjectId || eligibleCountPending || eligibleCount === 0}
+                aria-busy={eligibleCountPending || undefined}
               >
-                <option value="all">All Questions ({eligibleCount})</option>
+                <option value="all">
+                  {eligibleCountPending
+                    ? 'All Questions (…)'
+                    : `All Questions (${eligibleCount})`}
+                </option>
                 {countOptions.map((opt) => (
-                  <option key={opt} value={opt} disabled={opt > eligibleCount}>
+                  <option key={opt} value={opt} disabled={eligibleCountPending || opt > eligibleCount}>
                     {opt} Questions
                   </option>
                 ))}
@@ -284,12 +309,18 @@ export default function QuizSetupPage() {
 
           {selectedSubjectId ? (
             <p className="text-sm text-text-muted" aria-live="polite">
-              Available questions:{' '}
-              <span className="font-semibold text-primary-text">{eligibleCount}</span>
+              {eligibleCountPending ? (
+                'Checking available questions…'
+              ) : (
+                <>
+                  Available questions:{' '}
+                  <span className="font-semibold text-primary-text">{eligibleCount}</span>
+                </>
+              )}
             </p>
           ) : null}
 
-          {selectedSubjectId && eligibleCount === 0 ? (
+          {selectedSubjectId && !eligibleCountPending && eligibleCount === 0 ? (
             <Alert variant="warning">
               <div>
                 <span className="font-semibold">This selection has no questions yet.</span>{' '}
@@ -313,7 +344,12 @@ export default function QuizSetupPage() {
           <div className="flex flex-col gap-3 border-t border-border-subtle pt-6 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="submit"
-              disabled={!selectedSubjectId || eligibleCount === 0 || storePhase === 'loading'}
+              disabled={
+                !selectedSubjectId
+                || eligibleCountPending
+                || eligibleCount === 0
+                || storePhase === 'loading'
+              }
               variant="primary"
               className="w-full sm:w-auto sm:min-w-44"
             >
@@ -353,9 +389,11 @@ export default function QuizSetupPage() {
               <dd className="mt-1 font-medium text-text-main">
                 {!selectedSubjectId
                   ? '—'
-                  : activeQuestionCount === 'all'
-                    ? `All (${eligibleCount})`
-                    : `${activeQuestionCount} of ${eligibleCount}`}
+                  : eligibleCountPending
+                    ? 'Checking…'
+                    : activeQuestionCount === 'all'
+                      ? `All (${eligibleCount})`
+                      : `${activeQuestionCount} of ${eligibleCount}`}
               </dd>
             </div>
           </dl>

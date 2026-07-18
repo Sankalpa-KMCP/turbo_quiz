@@ -225,7 +225,7 @@ export default function SubjectsPage() {
                           to={`/subjects/${sub.id}`}
                           className="group inline-flex max-w-full items-center gap-1.5 rounded-sm text-lg font-semibold text-text-main transition-colors hover:text-primary-text focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                         >
-                          <span className="truncate">{sub.name}</span>
+                          <span className="break-words">{sub.name}</span>
                           <svg className="size-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                           </svg>
