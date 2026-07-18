@@ -233,8 +233,11 @@ describe('HistoryPage', () => {
     )
 
     await waitFor(() => {
-      const link = screen.getByRole('link', { name: /Review/i })
-      expect(link).toHaveAttribute('href', `/quiz/results/${attempt.id}`)
+      const links = screen.getAllByRole('link', { name: /Review/i })
+      expect(links.length).toBeGreaterThan(0)
+      for (const link of links) {
+        expect(link).toHaveAttribute('href', `/quiz/results/${attempt.id}`)
+      }
     })
   })
 })

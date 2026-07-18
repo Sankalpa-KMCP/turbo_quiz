@@ -4,45 +4,77 @@ import { MemoryRouter } from 'react-router-dom'
 import MistakesPage from '../MistakesPage'
 import { useQuizSessionStore } from '../../stores/quizSessionStore'
 
-// Mock the repositories
 const { mockGetMistakeProjections, mockSubjectGetAll, mockTopicGetAll } = vi.hoisted(() => ({
   mockGetMistakeProjections: vi.fn(),
   mockSubjectGetAll: vi.fn(),
-  mockTopicGetAll: vi.fn()
+  mockTopicGetAll: vi.fn(),
 }))
 
 vi.mock('../../db/repositories/QuizRepository', () => ({
   QuizRepository: class {
     getMistakeProjections = mockGetMistakeProjections
-  }
+  },
 }))
 
 vi.mock('../../db/repositories/SubjectRepository', () => ({
   SubjectRepository: class {
     getAll = mockSubjectGetAll
-  }
+  },
 }))
 
 vi.mock('../../db/repositories/TopicRepository', () => ({
   TopicRepository: class {
     getAll = mockTopicGetAll
-  }
+  },
 }))
 
-// Mock useQuizSessionStore
 vi.mock('../../stores/quizSessionStore', () => ({
-  useQuizSessionStore: vi.fn()
+  useQuizSessionStore: vi.fn(),
 }))
 
-// Mock useNavigate
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
     ...actual as Record<string, unknown>,
-    useNavigate: () => mockNavigate
+    useNavigate: () => mockNavigate,
   }
 })
+
+function mistakeProjection(overrides: {
+  subjectId: number
+  topicId: number | null
+  subjectNameSnap: string
+  topicNameSnap: string | null
+  questionId: number
+  questionText: string
+  selectedOptionIndex?: number | null
+  wasSkipped?: boolean
+}) {
+  const selected = overrides.selectedOptionIndex ?? 0
+  return {
+    parentAttempt: {
+      subjectId: overrides.subjectId,
+      topicId: overrides.topicId,
+      subjectNameSnap: overrides.subjectNameSnap,
+      topicNameSnap: overrides.topicNameSnap,
+    },
+    answerAttempt: {
+      questionId: overrides.questionId,
+      selectedOptionIndex: overrides.wasSkipped ? null : selected,
+      correctOptionIndex: 1,
+      isCorrect: false,
+      questionSnapshot: {
+        questionText: overrides.questionText,
+        options: ['Wrong', 'Right'],
+        correctOptionIndex: 1,
+        explanation: 'Because it is right.',
+        difficulty: 'easy' as const,
+      },
+    },
+    wasSkipped: overrides.wasSkipped ?? false,
+  }
+}
 
 describe('MistakesPage', () => {
   let mockConfigureSetup: unknown
@@ -67,7 +99,7 @@ describe('MistakesPage', () => {
     render(
       <MemoryRouter>
         <MistakesPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     )
 
     await waitFor(() => {
@@ -80,34 +112,43 @@ describe('MistakesPage', () => {
     mockTopicGetAll.mockResolvedValue([{ id: 10, subjectId: 1, name: 'Algebra', normalizedName: 'algebra', createdAt: 1 }])
 
     mockGetMistakeProjections.mockResolvedValue([
-      {
-        parentAttempt: { subjectId: 1, topicId: 10, subjectNameSnap: 'Math', topicNameSnap: 'Algebra' },
-        answerAttempt: { questionId: 100 }
-      },
-      {
-        parentAttempt: { subjectId: 1, topicId: null, subjectNameSnap: 'Math', topicNameSnap: null },
-        answerAttempt: { questionId: 101 }
-      }
+      mistakeProjection({
+        subjectId: 1,
+        topicId: 10,
+        subjectNameSnap: 'Math',
+        topicNameSnap: 'Algebra',
+        questionId: 100,
+        questionText: 'Algebra question stem',
+      }),
+      mistakeProjection({
+        subjectId: 1,
+        topicId: null,
+        subjectNameSnap: 'Math',
+        topicNameSnap: null,
+        questionId: 101,
+        questionText: 'Mixed topic question stem',
+        wasSkipped: true,
+      }),
     ])
 
     render(
       <MemoryRouter>
         <MistakesPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     )
 
     await waitFor(() => {
       expect(screen.getByText(/2 Active Mistakes/i)).toBeInTheDocument()
     })
 
-    // Expect groups
     expect(screen.getAllByText('Math')).toHaveLength(2)
     expect(screen.getByText('Algebra')).toBeInTheDocument()
-    expect(screen.getByText('Mixed / No Topic')).toBeInTheDocument()
+    expect(screen.getByText('No specific topic')).toBeInTheDocument()
+    expect(screen.getByText('Algebra question stem')).toBeInTheDocument()
+    expect(screen.getByText('Mixed topic question stem')).toBeInTheDocument()
 
-    // Retry specific group (Math / Algebra)
     const retryButtons = screen.getAllByRole('button', { name: /Retry Group/i })
-    fireEvent.click(retryButtons[1]) // Second group is Math / Algebra because null topics sort first
+    fireEvent.click(retryButtons[1])
 
     await waitFor(() => {
       expect(mockConfigureSetup).toHaveBeenCalledWith({
@@ -115,7 +156,7 @@ describe('MistakesPage', () => {
         topicId: 10,
         mode: 'mistakes',
         questionCount: 'all',
-        retryQuestionIds: [100]
+        retryQuestionIds: [100],
       })
       expect(mockStartSession).toHaveBeenCalled()
       expect(mockNavigate).toHaveBeenCalledWith('/quiz/play')
@@ -127,20 +168,29 @@ describe('MistakesPage', () => {
     mockTopicGetAll.mockResolvedValue([])
 
     mockGetMistakeProjections.mockResolvedValue([
-      {
-        parentAttempt: { subjectId: 1, topicId: 10, subjectNameSnap: 'Math', topicNameSnap: 'Algebra' },
-        answerAttempt: { questionId: 100 }
-      },
-      {
-        parentAttempt: { subjectId: 1, topicId: null, subjectNameSnap: 'Math', topicNameSnap: null },
-        answerAttempt: { questionId: 101 }
-      }
+      mistakeProjection({
+        subjectId: 1,
+        topicId: 10,
+        subjectNameSnap: 'Math',
+        topicNameSnap: 'Algebra',
+        questionId: 100,
+        questionText: 'Q100',
+      }),
+      mistakeProjection({
+        subjectId: 1,
+        topicId: null,
+        subjectNameSnap: 'Math',
+        topicNameSnap: null,
+        questionId: 101,
+        questionText: 'Q101',
+        wasSkipped: true,
+      }),
     ])
 
     render(
       <MemoryRouter>
         <MistakesPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     )
 
     await waitFor(() => {
@@ -155,7 +205,7 @@ describe('MistakesPage', () => {
         topicId: null,
         mode: 'mistakes',
         questionCount: 'all',
-        retryQuestionIds: [101, 100] // Mixed topic sorts first due to topicName === null
+        retryQuestionIds: [101, 100],
       })
       expect(mockStartSession).toHaveBeenCalled()
       expect(mockNavigate).toHaveBeenCalledWith('/quiz/play')
@@ -167,20 +217,28 @@ describe('MistakesPage', () => {
     mockTopicGetAll.mockResolvedValue([])
 
     mockGetMistakeProjections.mockResolvedValue([
-      {
-        parentAttempt: { subjectId: 1, topicId: null, subjectNameSnap: 'Math', topicNameSnap: null },
-        answerAttempt: { questionId: 100 }
-      },
-      {
-        parentAttempt: { subjectId: 2, topicId: null, subjectNameSnap: 'Bio', topicNameSnap: null },
-        answerAttempt: { questionId: 200 }
-      }
+      mistakeProjection({
+        subjectId: 1,
+        topicId: null,
+        subjectNameSnap: 'Math',
+        topicNameSnap: null,
+        questionId: 100,
+        questionText: 'Math Q',
+      }),
+      mistakeProjection({
+        subjectId: 2,
+        topicId: null,
+        subjectNameSnap: 'Bio',
+        topicNameSnap: null,
+        questionId: 200,
+        questionText: 'Bio Q',
+      }),
     ])
 
     render(
       <MemoryRouter>
         <MistakesPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     )
 
     await waitFor(() => {

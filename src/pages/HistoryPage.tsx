@@ -5,7 +5,7 @@ import { QuizRepository } from '../db/repositories/QuizRepository'
 import { SubjectRepository } from '../db/repositories/SubjectRepository'
 import { type QuizAttempt, type Subject } from '../types/db'
 
-import { Card } from '../components/ui/Card'
+import { Alert } from '../components/ui/Alert'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { buttonStyles } from '../components/ui/buttonStyles'
@@ -13,6 +13,7 @@ import { Select } from '../components/ui/Select'
 import { EmptyState } from '../components/ui/EmptyState'
 import { LoadingState } from '../components/ui/LoadingState'
 import { PageHeader } from '../components/ui/PageHeader'
+import { cn } from '../utils/cn'
 
 const quizRepo = new QuizRepository(db)
 const subjectRepo = new SubjectRepository(db)
@@ -54,7 +55,6 @@ export default function HistoryPage() {
     }
   }, [selectedSubjectId])
 
-  // Safe formatting helpers
   const formatDate = (timestamp: number) => {
     try {
       return new Date(timestamp).toLocaleDateString(undefined, {
@@ -62,7 +62,7 @@ export default function HistoryPage() {
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       })
     } catch {
       return 'Unknown Date'
@@ -81,25 +81,20 @@ export default function HistoryPage() {
 
   if (hasError) {
     return (
-      <Card className="p-8 max-w-md mx-auto text-center space-y-6">
-        <div className="inline-flex p-3 bg-danger-bg rounded-full text-danger-text">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-text-main">Database Connection Error</h2>
-          <p className="text-sm text-text-muted">We encountered an issue reading your quiz history from the database.</p>
-          <p className="text-xs text-text-muted mt-2">Refresh the page and try again. TurboQuiz stores its data locally in this browser.</p>
-        </div>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="primary"
-          className="w-full"
-        >
+      <div className="mx-auto max-w-lg space-y-6 py-4">
+        <Alert variant="danger">
+          <div className="space-y-2">
+            <p className="font-semibold text-danger-text">Database Connection Error</p>
+            <p>We encountered an issue reading your quiz history from the database.</p>
+            <p className="text-xs opacity-90">
+              Refresh the page and try again. TurboQuiz stores its data locally in this browser.
+            </p>
+          </div>
+        </Alert>
+        <Button onClick={() => window.location.reload()} variant="primary" className="w-full sm:w-auto">
           Reload History
         </Button>
-      </Card>
+      </div>
     )
   }
 
@@ -107,7 +102,7 @@ export default function HistoryPage() {
   const isFilteredEmpty = selectedSubjectId !== null && attempts.length === 0
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="mx-auto max-w-5xl space-y-8">
       <PageHeader
         title="Quiz History"
         description="Review completed sessions, compare scores, and open detailed scorecards."
@@ -148,71 +143,74 @@ export default function HistoryPage() {
           action={<Link to="/quiz/setup" className={buttonStyles({ variant: 'primary' })}>Start quiz</Link>}
         />
       ) : isFilteredEmpty ? (
-        <Card className="p-10 text-center space-y-2">
-          <h2 className="text-lg font-bold text-text-main">No Attempts for this Subject</h2>
-          <p className="text-sm text-text-muted">
-            Try choosing a different subject or start a new quiz attempt.
-          </p>
-        </Card>
+        <EmptyState
+          title="No Attempts for this Subject"
+          description="Try choosing a different subject or start a new quiz attempt."
+        />
       ) : (
-        /* History Grid & Responsive Table */
-        <Card className="overflow-hidden p-0 border-border-subtle">
-          {/* Desktop Table View */}
+        <>
           <div
-            className="hidden md:block overflow-x-auto"
+            className="hidden overflow-x-auto md:block"
             tabIndex={0}
             role="region"
             aria-label="Quiz history table"
           >
-            <table className="w-full min-w-[768px] text-left border-collapse">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-border-subtle text-xs text-text-muted font-semibold uppercase tracking-wider bg-surface-raised/60">
-                  <th className="p-4 pl-6">Quiz Info</th>
-                  <th className="p-4">Mode</th>
-                  <th className="p-4 text-center">Score</th>
-                  <th className="p-4">Time Taken</th>
-                  <th className="p-4">Date Completed</th>
-                  <th className="p-4 pr-6 text-right">Action</th>
+                <tr className="border-b border-border-subtle text-xs font-semibold uppercase tracking-wider text-text-muted">
+                  <th scope="col" className="py-3 pr-4 font-semibold">Quiz Info</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Mode</th>
+                  <th scope="col" className="px-4 py-3 text-center font-semibold">Score</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Time Taken</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Date Completed</th>
+                  <th scope="col" className="py-3 pl-4 text-right font-semibold">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle">
                 {attempts.map((attempt) => {
                   const hasPerfectScore = attempt.scorePercentage === 100
                   return (
-                    <tr key={attempt.id} className="hover:bg-surface-overlay/20 transition-colors">
-                      <td className="p-4 pl-6">
-                        <div className="font-semibold text-text-main">
+                    <tr key={attempt.id} className="align-top">
+                      <td className="py-4 pr-4">
+                        <div className="font-medium text-text-main">
                           {attempt.subjectNameSnap || 'Deleted Subject'}
                         </div>
-                        {attempt.topicNameSnap && (
-                          <div className="text-xs text-text-muted">{attempt.topicNameSnap}</div>
-                        )}
+                        {attempt.topicNameSnap ? (
+                          <div className="mt-0.5 text-xs text-text-muted">{attempt.topicNameSnap}</div>
+                        ) : null}
                       </td>
-                      <td className="p-4">
-                        <span className="capitalize text-text-main text-sm font-medium">{attempt.mode}</span>
+                      <td className="px-4 py-4">
+                        <span className="text-sm font-medium capitalize text-text-main">{attempt.mode}</span>
                       </td>
-                      <td className="p-4 text-center">
-                        <span className={`text-base font-bold ${hasPerfectScore ? 'text-primary-text' : 'text-text-main'}`}>
+                      <td className="px-4 py-4 text-center">
+                        <span
+                          className={cn(
+                            'text-base font-semibold',
+                            hasPerfectScore ? 'text-primary-text' : 'text-text-main',
+                          )}
+                        >
                           {attempt.correctAnswers} / {attempt.totalQuestions}
                         </span>
-                        <span className="block text-xs text-text-muted">{attempt.scorePercentage}%</span>
+                        <span className="mt-0.5 block text-xs text-text-muted">
+                          {attempt.scorePercentage}%
+                        </span>
                       </td>
-                      <td className="p-4 text-text-main text-sm font-medium">
+                      <td className="px-4 py-4 text-sm font-medium text-text-main">
                         {formatDuration(attempt.timeTakenSeconds)}
                       </td>
-                      <td className="p-4 text-text-muted text-sm">
+                      <td className="px-4 py-4 text-sm text-text-muted whitespace-nowrap">
                         {formatDate(attempt.completedAt)}
                       </td>
-                      <td className="p-4 pr-6 text-right">
+                      <td className="py-4 pl-4 text-right">
                         <Link
                           to={`/quiz/results/${attempt.id}`}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-primary-text hover:text-primary-hover transition-colors focus:outline-none focus:underline"
-                          title="Review attempt scorecard"
+                          className="inline-flex min-h-11 items-center justify-end text-sm font-semibold text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:underline"
                         >
                           Review
-                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                          </svg>
+                          <span className="sr-only">
+                            {' '}
+                            {attempt.subjectNameSnap || 'Deleted Subject'} attempt
+                          </span>
                         </Link>
                       </td>
                     </tr>
@@ -222,58 +220,58 @@ export default function HistoryPage() {
             </table>
           </div>
 
-          {/* Mobile Card List View */}
-          <div className="md:hidden divide-y divide-border-subtle">
+          <ul className="divide-y divide-border-subtle border-t border-border-subtle md:hidden">
             {attempts.map((attempt) => (
-              <div key={attempt.id} className="p-5 space-y-4">
-                <div className="flex justify-between items-start gap-4">
-                  <div>
-                    <h2 className="font-bold text-text-main leading-tight">
+              <li key={attempt.id} className="space-y-3 py-5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h2 className="font-medium leading-tight text-text-main">
                       {attempt.subjectNameSnap || 'Deleted Subject'}
                     </h2>
-                    {attempt.topicNameSnap && (
-                      <p className="text-xs text-text-muted mt-0.5">{attempt.topicNameSnap}</p>
-                    )}
+                    {attempt.topicNameSnap ? (
+                      <p className="mt-0.5 text-xs text-text-muted">{attempt.topicNameSnap}</p>
+                    ) : null}
                   </div>
                   <Badge variant="default" className="capitalize">
                     {attempt.mode}
                   </Badge>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                  <div className="bg-surface-base/40 p-2 rounded-lg border border-border-subtle">
-                    <span className="block text-text-muted font-semibold uppercase tracking-wider mb-1">Score</span>
-                    <span className="font-bold text-text-main">
+                <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Score</dt>
+                    <dd className="mt-0.5 font-semibold text-text-main">
                       {attempt.correctAnswers}/{attempt.totalQuestions} ({attempt.scorePercentage}%)
-                    </span>
+                    </dd>
                   </div>
-                  <div className="bg-surface-base/40 p-2 rounded-lg border border-border-subtle">
-                    <span className="block text-text-muted font-semibold uppercase tracking-wider mb-1">Time</span>
-                    <span className="font-bold text-text-main">{formatDuration(attempt.timeTakenSeconds)}</span>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Time</dt>
+                    <dd className="mt-0.5 font-semibold text-text-main">
+                      {formatDuration(attempt.timeTakenSeconds)}
+                    </dd>
                   </div>
-                  <div className="bg-surface-base/40 p-2 rounded-lg border border-border-subtle">
-                    <span className="block text-text-muted font-semibold uppercase tracking-wider mb-1">Date</span>
-                    <span className="font-bold text-text-muted">
-                      {new Date(attempt.completedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                    </span>
+                  <div>
+                    <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">Date</dt>
+                    <dd className="mt-0.5 font-medium text-text-main">
+                      {formatDate(attempt.completedAt)}
+                    </dd>
                   </div>
-                </div>
+                </dl>
 
-                <div className="text-right">
-                  <Link
-                    to={`/quiz/results/${attempt.id}`}
-                    className="inline-flex min-h-11 w-full sm:w-auto justify-center items-center gap-1.5 px-4 py-2 bg-surface-overlay hover:bg-border-strong text-text-main font-bold rounded-xl text-xs transition-colors border border-border-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base"
-                  >
-                    View Scorecard
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                </div>
-              </div>
+                <Link
+                  to={`/quiz/results/${attempt.id}`}
+                  className={cn(buttonStyles({ variant: 'secondary', size: 'sm' }), 'w-full justify-center')}
+                >
+                  Review
+                  <span className="sr-only">
+                    {' '}
+                    {attempt.subjectNameSnap || 'Deleted Subject'} attempt
+                  </span>
+                </Link>
+              </li>
             ))}
-          </div>
-        </Card>
+          </ul>
+        </>
       )}
     </div>
   )

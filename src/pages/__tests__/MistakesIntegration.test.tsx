@@ -137,7 +137,8 @@ describe('Mistakes Integration', () => {
     // 4. Verify the active mistake is rendered
     expect(screen.getByText('1 Active Mistake')).toBeInTheDocument()
     expect(screen.getByText('Geography')).toBeInTheDocument()
-    expect(screen.getByText('Mixed / No Topic')).toBeInTheDocument()
+    expect(screen.getByText('No specific topic')).toBeInTheDocument()
+    expect(screen.getByText('Capital of France?')).toBeInTheDocument()
 
     // 5. Start a retry session
     fireEvent.click(screen.getByRole('button', { name: /Retry Group/i }))

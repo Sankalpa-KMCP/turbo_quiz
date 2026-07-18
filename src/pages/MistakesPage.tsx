@@ -5,8 +5,9 @@ import { QuizRepository } from '../db/repositories/QuizRepository'
 import { SubjectRepository } from '../db/repositories/SubjectRepository'
 import { TopicRepository } from '../db/repositories/TopicRepository'
 import { useQuizSessionStore } from '../stores/quizSessionStore'
+import { type AnswerAttempt } from '../types/db'
 
-import { Card } from '../components/ui/Card'
+import { Alert } from '../components/ui/Alert'
 import { Badge } from '../components/ui/Badge'
 import { Button } from '../components/ui/Button'
 import { buttonStyles } from '../components/ui/buttonStyles'
@@ -18,12 +19,23 @@ const quizRepo = new QuizRepository(db)
 const subjectRepo = new SubjectRepository(db)
 const topicRepo = new TopicRepository(db)
 
+interface MistakeItem {
+  questionId: number
+  answerAttempt: AnswerAttempt
+  wasSkipped: boolean
+}
+
 interface GroupedMistakes {
   subjectId: number
   topicId: number | null
   subjectName: string
   topicName: string | null
   questionIds: number[]
+  items: MistakeItem[]
+}
+
+function topicFallbackLabel(topicName: string | null): string {
+  return topicName ?? 'No specific topic'
 }
 
 export default function MistakesPage() {
@@ -50,7 +62,6 @@ export default function MistakesPage() {
         const subjectMap = new Map(subjects.map((s) => [s.id, s.name]))
         const topicMap = new Map(topics.map((t) => [t.id, t.name]))
 
-        // Filter out deleted questions
         const activeMistakes = projections.filter((p) => p.answerAttempt.questionId !== null)
 
         const groups = new Map<string, GroupedMistakes>()
@@ -60,8 +71,6 @@ export default function MistakesPage() {
           const sId = p.parentAttempt.subjectId
           const tId = p.parentAttempt.topicId
 
-          // If subjectId is null, the subject was deleted, so questions should have been deleted too.
-          // We defensively skip it if it happens.
           if (sId === null) continue
 
           const key = `${sId}-${tId === null ? 'null' : tId}`
@@ -74,12 +83,19 @@ export default function MistakesPage() {
               topicName: tId !== null
                 ? (topicMap.get(tId) || p.parentAttempt.topicNameSnap || 'Unknown Topic')
                 : null,
-              questionIds: []
+              questionIds: [],
+              items: [],
             })
           }
 
           const qId = p.answerAttempt.questionId!
-          groups.get(key)!.questionIds.push(qId)
+          const group = groups.get(key)!
+          group.questionIds.push(qId)
+          group.items.push({
+            questionId: qId,
+            answerAttempt: p.answerAttempt,
+            wasSkipped: p.wasSkipped,
+          })
           total++
         }
 
@@ -113,7 +129,21 @@ export default function MistakesPage() {
       topicId: group.topicId,
       mode: 'mistakes',
       questionCount: 'all',
-      retryQuestionIds: group.questionIds
+      retryQuestionIds: group.questionIds,
+    })
+    await startSession()
+    navigate('/quiz/play')
+  }
+
+  const handleRetryAll = async () => {
+    const allQuestionIds = groupedMistakes.flatMap((g) => g.questionIds)
+    const first = groupedMistakes[0]
+    configureSetup({
+      subjectId: first.subjectId,
+      topicId: null,
+      mode: 'mistakes',
+      questionCount: 'all',
+      retryQuestionIds: allQuestionIds,
     })
     await startSession()
     navigate('/quiz/play')
@@ -125,34 +155,34 @@ export default function MistakesPage() {
 
   if (hasError) {
     return (
-      <Card className="p-8 max-w-md mx-auto text-center space-y-6">
-        <div className="inline-flex p-3 bg-danger-bg rounded-full text-danger-text">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-bold text-text-main">Failed to Load Mistakes</h2>
-          <p className="text-sm text-text-muted">We encountered an issue reading your quiz mistakes from the database.</p>
-        </div>
-        <Button
-          onClick={() => window.location.reload()}
-          variant="primary"
-          className="w-full"
-        >
+      <div className="mx-auto max-w-lg space-y-6 py-4">
+        <Alert variant="danger">
+          <div className="space-y-2">
+            <p className="font-semibold text-danger-text">Failed to Load Mistakes</p>
+            <p>We encountered an issue reading your quiz mistakes from the database.</p>
+          </div>
+        </Alert>
+        <Button onClick={() => window.location.reload()} variant="primary" className="w-full sm:w-auto">
           Retry
         </Button>
-      </Card>
+      </div>
     )
   }
 
-  const uniqueSubjects = new Set(groupedMistakes.map(g => g.subjectId))
+  const uniqueSubjects = new Set(groupedMistakes.map((g) => g.subjectId))
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="mx-auto max-w-4xl space-y-8">
       <PageHeader
         title="Mistakes & Weaknesses"
         description="Review questions you missed or skipped, then retry focused groups until they are resolved."
+        action={
+          totalMistakes > 0 && uniqueSubjects.size === 1 ? (
+            <Button onClick={handleRetryAll} variant="primary">
+              Retry All {totalMistakes}
+            </Button>
+          ) : undefined
+        }
       />
 
       {totalMistakes === 0 ? (
@@ -168,62 +198,103 @@ export default function MistakesPage() {
           action={<Link to="/quiz/setup" className={buttonStyles({ variant: 'primary' })}>Practice more</Link>}
         />
       ) : (
-        <div className="space-y-6">
-          <Card className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6">
-            <div>
-              <h2 className="text-lg font-bold text-text-main">{totalMistakes} Active Mistake{totalMistakes !== 1 ? 's' : ''}</h2>
-              <p className="text-sm text-text-muted">Questions that were answered incorrectly or skipped on your latest attempt.</p>
-            </div>
+        <div className="space-y-10">
+          <section aria-label="Mistakes summary" className="border-b border-border-subtle pb-5">
+            <h2 className="text-base font-semibold text-text-main">
+              {totalMistakes} Active Mistake{totalMistakes !== 1 ? 's' : ''}
+            </h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Questions that were answered incorrectly or skipped on your latest attempt for each item.
+            </p>
+          </section>
 
-            {uniqueSubjects.size === 1 && (
-              <Button
-                onClick={() => {
-                  const allQuestionIds = groupedMistakes.flatMap(g => g.questionIds)
-                  const first = groupedMistakes[0]
-                  configureSetup({
-                    subjectId: first.subjectId,
-                    topicId: null,
-                    mode: 'mistakes',
-                    questionCount: 'all',
-                    retryQuestionIds: allQuestionIds
-                  })
-                  startSession().then(() => {
-                    navigate('/quiz/play')
-                  })
-                }}
-                variant="primary"
-                className="shrink-0 font-bold"
-              >
-                Retry All {totalMistakes}
-              </Button>
-            )}
-          </Card>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            {groupedMistakes.map((group) => (
-              <Card key={`${group.subjectId}-${group.topicId}`} className="p-5 flex flex-col justify-between space-y-4">
-                <div>
-                  <h3 className="font-bold text-text-main">{group.subjectName}</h3>
-                  <p className="text-sm text-text-muted font-medium">
-                    {group.topicName ? group.topicName : 'Mixed / No Topic'}
+          {groupedMistakes.map((group) => (
+            <section
+              key={`${group.subjectId}-${group.topicId}`}
+              className="space-y-4"
+              aria-labelledby={`mistake-group-${group.subjectId}-${group.topicId ?? 'none'}`}
+            >
+              <div className="flex flex-col gap-3 border-b border-border-subtle pb-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                  <h2
+                    id={`mistake-group-${group.subjectId}-${group.topicId ?? 'none'}`}
+                    className="text-base font-semibold text-text-main"
+                  >
+                    {group.subjectName}
+                  </h2>
+                  <p className="mt-0.5 text-sm text-text-muted">
+                    <span>{topicFallbackLabel(group.topicName)}</span>
+                    <span aria-hidden="true"> · </span>
+                    <span>
+                      {group.questionIds.length} mistake{group.questionIds.length !== 1 ? 's' : ''}
+                    </span>
                   </p>
-                  <div className="mt-2.5">
-                    <Badge variant="danger" className="font-semibold">
-                      {group.questionIds.length} Mistake{group.questionIds.length !== 1 ? 's' : ''}
-                    </Badge>
-                  </div>
                 </div>
-
                 <Button
                   onClick={() => handleRetryGroup(group)}
                   variant="secondary"
-                  className="w-full text-center"
+                  size="sm"
+                  className="w-full shrink-0 sm:w-auto"
+                  aria-label={`Retry group: ${group.subjectName}, ${topicFallbackLabel(group.topicName)}`}
                 >
                   Retry Group
                 </Button>
-              </Card>
-            ))}
-          </div>
+              </div>
+
+              <ul className="divide-y divide-border-subtle border-t border-border-subtle">
+                {group.items.map((item) => {
+                  const snap = item.answerAttempt.questionSnapshot
+                  const selectedIdx = item.answerAttempt.selectedOptionIndex
+                  const correctIdx = snap.correctOptionIndex
+                  const chosenText = item.wasSkipped || selectedIdx === null
+                    ? null
+                    : snap.options[selectedIdx]
+                  const correctText = snap.options[correctIdx]
+
+                  return (
+                    <li key={item.questionId} className="space-y-3 py-5">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <p className="min-w-0 flex-1 font-serif text-base font-semibold leading-relaxed tracking-tight text-text-main whitespace-pre-wrap">
+                          {snap.questionText}
+                        </p>
+                        <Badge variant={item.wasSkipped ? 'warning' : 'danger'}>
+                          {item.wasSkipped ? 'Skipped' : 'Incorrect'}
+                        </Badge>
+                      </div>
+
+                      <dl className="space-y-2 text-sm">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                            Your answer
+                          </dt>
+                          <dd className="mt-0.5 text-danger-text">
+                            {chosenText ?? 'No answer selected'}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wider text-text-muted">
+                            Correct answer
+                          </dt>
+                          <dd className="mt-0.5 text-success-text">{correctText}</dd>
+                        </div>
+                      </dl>
+
+                      {snap.explanation ? (
+                        <div className="rounded-lg border border-border-subtle bg-surface-raised px-3 py-2.5">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-text-muted">
+                            Explanation
+                          </p>
+                          <p className="mt-1 text-sm leading-relaxed text-text-main whitespace-pre-wrap">
+                            {snap.explanation}
+                          </p>
+                        </div>
+                      ) : null}
+                    </li>
+                  )
+                })}
+              </ul>
+            </section>
+          ))}
         </div>
       )}
     </div>
