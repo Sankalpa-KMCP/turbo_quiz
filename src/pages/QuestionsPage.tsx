@@ -52,6 +52,8 @@ export default function QuestionsPage() {
     }
   }, [debouncedSearchText, rawSearchText, setSearchParams])
 
+  const allSubjects = useLiveQuery(() => subjectRepo.getAll(), [])
+
   const subject = useLiveQuery(
     () => (isValidSubjectId ? subjectRepo.getById(parsedSubjectId).then(s => s ?? null) : Promise.resolve(null)),
     [isValidSubjectId, parsedSubjectId]
@@ -90,22 +92,58 @@ export default function QuestionsPage() {
   }
 
   if (!isValidSubjectId) {
+    if (allSubjects === undefined) {
+      return <LoadingState label="Loading subjects…" />
+    }
+
+    if (allSubjects.length === 0) {
+      return (
+        <div className="max-w-5xl mx-auto space-y-6">
+          <PageHeader
+            title="Questions Bank"
+            description="Questions are organized inside subjects so your practice sessions stay focused."
+          />
+          <EmptyState
+            title="Create a subject first"
+            description="Add a subject to your library, then return here to browse and manage its questions."
+            icon={
+              <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            }
+            action={<Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>Create your first subject</Link>}
+          />
+        </div>
+      )
+    }
+
     return (
       <div className="max-w-5xl mx-auto space-y-6">
         <PageHeader
           title="Questions Bank"
-          description="Questions are organized inside subjects so your practice sessions stay focused."
+          description="Choose a subject to browse, search, create, and edit questions in its bank."
         />
-        <EmptyState
-          title="Choose a subject first"
-          description="Open a subject to browse, search, create, and edit the questions in its bank."
-          icon={
-            <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 14h.01M16 10h.01M9 18l-4 3v-4a8 8 0 1114.5-4.7" />
-            </svg>
-          }
-          action={<Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>Browse subjects</Link>}
-        />
+        <Card className="p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-text-main">Select a subject</h2>
+          <p className="mt-1 text-sm text-text-muted">
+            Questions stay scoped to one subject so practice sessions remain focused.
+          </p>
+          <ul className="mt-4 divide-y divide-border-subtle border-t border-border-subtle">
+            {allSubjects.map((item) => (
+              <li key={item.id}>
+                <Link
+                  to={`/questions?subjectId=${item.id}`}
+                  className="flex min-h-11 items-center justify-between gap-3 py-3 text-sm font-medium text-text-main transition-colors hover:text-primary-text focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-raised rounded-sm"
+                >
+                  <span>{item.name}</span>
+                  <svg className="w-4 h-4 shrink-0 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Card>
       </div>
     )
   }

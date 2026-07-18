@@ -19,7 +19,7 @@ export const Alert = forwardRef<HTMLDivElement, AlertProps>(
         ref={ref}
         role={role}
         className={cn(
-          'px-4 py-3 rounded-xl border flex items-start text-sm leading-6',
+          'px-4 py-3 rounded-lg border flex items-start text-sm leading-6',
           variants[variant],
           className
         )}

@@ -17,4 +17,13 @@ describe('Button', () => {
     render(<Button className="custom-class">Test</Button>)
     expect(screen.getByRole('button')).toHaveClass('custom-class')
   })
+
+  it('uses restrained semibold emphasis and moderate radius by default', () => {
+    render(<Button>Primary</Button>)
+    const button = screen.getByRole('button', { name: 'Primary' })
+    expect(button).toHaveClass('font-semibold')
+    expect(button).toHaveClass('rounded-lg')
+    expect(button).not.toHaveClass('font-bold')
+    expect(button).not.toHaveClass('shadow-sm')
+  })
 })

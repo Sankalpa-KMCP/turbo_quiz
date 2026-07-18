@@ -34,10 +34,31 @@ describe('QuestionsPage', () => {
     await db.questions.clear()
   })
 
-  it('guides users without a subject selection', () => {
+  it('shows a loading state while subjects load without subjectId', async () => {
     renderWithRouter('/questions')
-    expect(screen.getByText('Choose a subject first')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Browse subjects/i })).toHaveAttribute('href', '/subjects')
+    expect(screen.getByText(/Loading subjects/i)).toBeInTheDocument()
+  })
+
+  it('guides users to create a subject when the library is empty', async () => {
+    renderWithRouter('/questions')
+    await waitFor(() => {
+      expect(screen.getByText('Create a subject first')).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /Create your first subject/i })).toHaveAttribute('href', '/subjects')
+  })
+
+  it('offers an inline subject picker when subjects exist and subjectId is missing', async () => {
+    const biology = await subjectRepo.create({ name: 'Biology', description: null })
+    const history = await subjectRepo.create({ name: 'History', description: null })
+
+    renderWithRouter('/questions')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: /Select a subject/i })).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('link', { name: 'Biology' })).toHaveAttribute('href', `/questions?subjectId=${biology.id}`)
+    expect(screen.getByRole('link', { name: 'History' })).toHaveAttribute('href', `/questions?subjectId=${history.id}`)
   })
 
   it('handles not found subject', async () => {

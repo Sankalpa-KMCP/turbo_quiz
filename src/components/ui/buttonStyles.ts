@@ -9,13 +9,13 @@ interface ButtonStyleOptions {
 }
 
 export const buttonStyles = ({ variant = 'primary', size = 'md' }: ButtonStyleOptions = {}) => {
-  const baseStyles = 'inline-flex items-center justify-center gap-2 font-bold rounded-xl transition-[background-color,border-color,color,transform] focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer shadow-sm active:translate-y-px'
+  const baseStyles = 'inline-flex items-center justify-center gap-2 font-semibold rounded-lg transition-[background-color,border-color,color] focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none cursor-pointer'
 
   const variants = {
     primary: 'bg-primary-base hover:bg-primary-hover text-text-inverse',
-    secondary: 'bg-surface-overlay hover:bg-border-strong text-text-main border border-border-subtle',
+    secondary: 'bg-surface-raised hover:bg-surface-overlay text-text-main border border-border-subtle',
     outline: 'bg-transparent border border-border-strong hover:bg-surface-overlay text-text-main',
-    ghost: 'bg-transparent hover:bg-surface-overlay text-text-main shadow-none',
+    ghost: 'bg-transparent hover:bg-surface-overlay text-text-main',
     danger: 'bg-danger-base hover:bg-danger-hover text-text-inverse'
   }
 

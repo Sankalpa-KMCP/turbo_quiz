@@ -20,12 +20,12 @@ export function EmptyState({
   className
 }: EmptyStateProps) {
   return (
-    <Card className={cn('px-6 py-10 text-center sm:px-10 sm:py-12', className)}>
+    <Card className={cn('px-6 py-8 text-center sm:px-8 sm:py-10', className)}>
       <div className="mx-auto flex max-w-md flex-col items-center">
         {icon ? (
           <div
             className={cn(
-              'mb-5 inline-flex size-14 items-center justify-center rounded-2xl border',
+              'mb-4 inline-flex size-12 items-center justify-center rounded-lg border',
               tone === 'success'
                 ? 'border-success-border bg-success-bg text-success-text'
                 : 'border-border-subtle bg-surface-overlay text-text-muted'
@@ -35,7 +35,7 @@ export function EmptyState({
             {icon}
           </div>
         ) : null}
-        <h2 className="text-lg font-bold text-text-main">{title}</h2>
+        <h2 className="text-lg font-semibold text-text-main">{title}</h2>
         <div className="mt-1.5 text-sm leading-6 text-text-muted">{description}</div>
         {action ? <div className="mt-5 flex flex-wrap justify-center gap-3">{action}</div> : null}
       </div>

@@ -8,7 +8,10 @@ describe('shared page patterns', () => {
   it('renders a semantic page heading with supporting content', () => {
     render(<PageHeader title="Questions Bank" description="Manage your questions." action={<button>New</button>} />)
 
-    expect(screen.getByRole('heading', { level: 1, name: 'Questions Bank' })).toBeInTheDocument()
+    const heading = screen.getByRole('heading', { level: 1, name: 'Questions Bank' })
+    expect(heading).toBeInTheDocument()
+    expect(heading).toHaveClass('font-serif')
+    expect(heading).toHaveClass('font-semibold')
     expect(screen.getByText('Manage your questions.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'New' })).toBeInTheDocument()
   })
