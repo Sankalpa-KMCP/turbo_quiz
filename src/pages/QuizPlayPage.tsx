@@ -2,6 +2,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useQuizSessionStore } from '../stores/quizSessionStore'
 
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Alert } from '../components/ui/Alert'
+import { Badge } from '../components/ui/Badge'
+import { cn } from '../utils/cn'
+
 export default function QuizPlayPage() {
   const navigate = useNavigate()
   const phase = useQuizSessionStore((s) => s.phase)
@@ -109,44 +115,58 @@ export default function QuizPlayPage() {
     }
   }
 
-
-
   const unansweredCount = questions.filter(
     (q) => answers[q.questionId]?.selectedOptionIndex === null
   ).length
+  const progressPercentage = Math.round(((currentIndex + 1) / questions.length) * 100)
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Quiz Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 border border-slate-800 p-6 rounded-2xl">
+      <Card className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 sm:p-6">
         <div>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 capitalize mb-2">
+          <Badge variant="primary" className="capitalize mb-2">
             {mode} Mode
-          </span>
-          <h1 className="text-xl font-bold text-slate-100">
+          </Badge>
+          <h1 className="text-xl font-bold text-text-main">
             {subjectNameSnap}
-            {topicNameSnap && <span className="text-slate-400 font-medium"> • {topicNameSnap}</span>}
+            {topicNameSnap && <span className="text-text-muted font-medium"> • {topicNameSnap}</span>}
           </h1>
         </div>
-        <div className="flex items-center gap-2 bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl text-slate-200">
-          <svg className="w-5 h-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <div className="flex min-h-11 items-center gap-2 bg-surface-overlay border border-border-strong px-4 py-2 rounded-xl text-text-main" aria-label={`Elapsed time ${formatTime(elapsedSeconds)}`}>
+          <svg className="w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span className="font-mono font-bold text-lg">{formatTime(elapsedSeconds)}</span>
         </div>
-      </div>
+      </Card>
 
       {/* Main Question view */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-6">
-        <div className="flex justify-between items-center text-sm text-slate-400 border-b border-slate-800 pb-4">
+      <Card className="p-4 sm:p-6 space-y-6">
+        <div className="flex justify-between items-center text-sm text-text-muted border-b border-border-subtle pb-4">
           <span>Question {currentIndex + 1} of {questions.length}</span>
-          <span className="capitalize px-2 py-0.5 rounded bg-slate-800 text-slate-300 text-xs">
+          <span className="capitalize px-2 py-0.5 rounded bg-surface-overlay text-text-main text-xs">
             {currentQuestion.questionSnapshot.difficulty}
           </span>
         </div>
 
+        <div className="space-y-2">
+          <div className="h-1.5 overflow-hidden rounded-full bg-surface-overlay">
+            <div
+              className="h-full rounded-full bg-primary-base transition-[width]"
+              style={{ width: `${progressPercentage}%` }}
+              role="progressbar"
+              aria-label="Quiz progress"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={progressPercentage}
+            />
+          </div>
+          <p className="sr-only">{progressPercentage}% through this quiz</p>
+        </div>
+
         {/* Question Text */}
-        <h2 className="text-lg font-semibold text-slate-100 whitespace-pre-wrap">
+        <h2 className="text-lg font-semibold text-text-main whitespace-pre-wrap">
           {currentQuestion.questionSnapshot.questionText}
         </h2>
 
@@ -156,19 +176,19 @@ export default function QuizPlayPage() {
             const isSelected = selectedIndex === idx
             const isCorrectAnswer = idx === currentQuestion.questionSnapshot.correctOptionIndex
 
-            let optionStyle = 'bg-slate-800 hover:bg-slate-700/80 border-slate-700 text-slate-200'
+            let optionStyle = 'bg-surface-raised hover:bg-surface-overlay/80 border-border-subtle text-text-main'
             if (isSelected) {
-              optionStyle = 'bg-indigo-600/20 border-indigo-500 text-indigo-300'
+              optionStyle = 'bg-primary-base/10 border-primary-base text-primary-text'
             }
 
             // Feedback Mode
             if (showsFeedback && isAnswered) {
               if (isCorrectAnswer) {
-                optionStyle = 'bg-emerald-500/20 border-emerald-500 text-emerald-300 font-medium'
+                optionStyle = 'bg-success-bg border-success-border text-success-text font-medium'
               } else if (isSelected) {
-                optionStyle = 'bg-rose-500/20 border-rose-500 text-rose-300'
+                optionStyle = 'bg-danger-bg border-danger-border text-danger-text'
               } else {
-                optionStyle = 'bg-slate-800/50 border-slate-800 text-slate-500 opacity-60'
+                optionStyle = 'bg-surface-raised/50 border-border-subtle/50 text-text-muted/60 opacity-60'
               }
             }
 
@@ -178,18 +198,22 @@ export default function QuizPlayPage() {
                 type="button"
                 onClick={() => selectAnswer(idx)}
                 disabled={showsFeedback && isAnswered}
-                className={`w-full text-left p-4 rounded-xl border transition-all cursor-pointer flex justify-between items-center ${optionStyle}`}
+                className={cn(
+                  'w-full text-left p-4 rounded-xl border transition-all cursor-pointer flex justify-between items-center outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base',
+                  optionStyle
+                )}
+                aria-pressed={isSelected}
               >
                 <span>{option}</span>
                 {showsFeedback && isAnswered && (
                   <span>
                     {isCorrectAnswer && (
-                      <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg className="w-5 h-5 text-success-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                       </svg>
                     )}
                     {isSelected && !isCorrectAnswer && (
-                      <svg className="w-5 h-5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <svg className="w-5 h-5 text-danger-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                       </svg>
                     )}
@@ -202,101 +226,101 @@ export default function QuizPlayPage() {
 
         {/* Feedback Mode Explanation */}
         {showsFeedback && isAnswered && currentQuestion.questionSnapshot.explanation && (
-          <div className="bg-slate-800/40 border border-slate-800 p-4 rounded-xl space-y-2 mt-4">
-            <h4 className="text-sm font-semibold text-emerald-400">Explanation</h4>
-            <p className="text-sm text-slate-300 whitespace-pre-wrap">
+          <div className="bg-success-bg/20 border border-success-border/30 p-4 rounded-xl space-y-2 mt-4">
+            <h4 className="text-sm font-semibold text-success-text">Explanation</h4>
+            <p className="text-sm text-text-main whitespace-pre-wrap">
               {currentQuestion.questionSnapshot.explanation}
             </p>
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Navigation and Actions or Inline Confirmation */}
       {showConfirm ? (
-        <div
+        <Card
           role="dialog"
           aria-modal="true"
-          className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4 focus:outline-none"
+          className="p-6 space-y-4 focus:outline-none border-primary-base/50 ring-2 ring-primary-base/20"
           aria-labelledby="confirm-heading"
         >
           <div className="space-y-2">
-            <h3 id="confirm-heading" className="text-lg font-bold text-slate-100">Finish Quiz</h3>
-            <p className="text-sm text-slate-400">
+            <h3 id="confirm-heading" className="text-lg font-bold text-text-main">Finish Quiz</h3>
+            <p className="text-sm text-text-muted">
               Are you sure you want to finish the quiz?
               {unansweredCount > 0 && (
-                <span className="block text-amber-400 font-semibold mt-1">
+                <span className="block text-warning-text font-semibold mt-1">
                   You have {unansweredCount} unanswered question{unansweredCount > 1 ? 's' : ''}.
                 </span>
               )}
             </p>
           </div>
-          <div className="flex gap-3 justify-end">
-            <button
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+            <Button
               ref={cancelBtnRef}
-              type="button"
               onClick={closeConfirm}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              variant="secondary"
+              size="sm"
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               onClick={confirmFinish}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-slate-100 font-bold rounded-xl text-sm cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              variant="primary"
+              size="sm"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Answers'}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       ) : (
-        <div className="flex justify-between items-center bg-slate-900 border border-slate-800 p-4 rounded-2xl">
-          <button
-            type="button"
+        <Card className="flex flex-wrap justify-between items-center gap-3 p-3 sm:p-4">
+          <Button
             onClick={previousQuestion}
             disabled={currentIndex === 0}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-semibold rounded-xl text-sm transition-colors cursor-pointer"
+            variant="secondary"
+            size="sm"
           >
             Previous
-          </button>
+          </Button>
 
           <div className="flex gap-2">
             {!isAnswered && (
-              <button
-                type="button"
+              <Button
                 onClick={skipQuestion}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-sm transition-colors cursor-pointer"
+                variant="secondary"
+                size="sm"
               >
                 Skip
-              </button>
+              </Button>
             )}
 
             {isLastQuestion ? (
-              <button
+              <Button
                 ref={finishTriggerRef}
-                type="button"
                 onClick={openConfirm}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-bold rounded-xl text-sm transition-colors cursor-pointer"
+                variant="primary"
+                size="sm"
               >
                 Finish Quiz
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
+              <Button
                 onClick={nextQuestion}
-                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-bold rounded-xl text-sm transition-colors cursor-pointer"
+                variant="primary"
+                size="sm"
               >
                 Next
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Question Progress Navigator Grid */}
-      <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-3">
-        <h3 className="text-sm font-semibold text-slate-300">Question Navigator</h3>
+      <Card className="p-6 space-y-3">
+        <h3 className="text-sm font-semibold text-text-main">Question Navigator</h3>
         <div className="flex flex-wrap gap-2.5">
           {questions.map((q, idx) => {
             const ans = answers[q.questionId]
@@ -304,34 +328,38 @@ export default function QuizPlayPage() {
             const isQAnswered = ans?.selectedOptionIndex !== null
             const isQSkipped = ans?.selectedOptionIndex === null && ans?.timeTakenSeconds > 0
 
-            let style = 'bg-slate-800 text-slate-400 hover:bg-slate-700 border-slate-700'
+            let style = 'bg-surface-raised text-text-muted hover:bg-surface-overlay border-border-subtle'
             if (isCurrent) {
-              style = 'bg-indigo-500/10 border-indigo-500 text-indigo-400 font-bold ring-2 ring-indigo-500/50'
+              style = 'bg-primary-base/10 border-primary-base text-primary-text font-bold ring-2 ring-primary-base/50'
             } else if (isQAnswered) {
-              style = 'bg-indigo-600 text-slate-100 border-indigo-600'
+              style = 'bg-primary-base text-text-inverse border-primary-base'
             } else if (isQSkipped) {
-              style = 'bg-slate-800 border-amber-500/50 text-amber-500'
+              style = 'bg-surface-raised border-warning-border/50 text-warning-text'
             }
 
             return (
-              <button
+              <Button
                 key={idx}
-                type="button"
                 onClick={() => goToQuestion(idx)}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center text-sm font-semibold transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500 ${style}`}
+                variant="ghost"
+                className={cn(
+                  'size-11 rounded-xl border flex items-center justify-center text-sm font-semibold transition-all p-0 shadow-none',
+                  style
+                )}
+                aria-current={isCurrent ? 'step' : undefined}
               >
                 {idx + 1}
-              </button>
+              </Button>
             )
           })}
         </div>
-      </div>
+      </Card>
 
       {/* Completion Error display */}
       {(submitError || storeError) && (
-        <div role="alert" className="bg-rose-500/10 border border-rose-500/30 text-rose-400 px-4 py-3 rounded-xl text-sm">
+        <Alert variant="danger">
           {submitError || storeError}
-        </div>
+        </Alert>
       )}
     </div>
   )
