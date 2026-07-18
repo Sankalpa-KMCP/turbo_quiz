@@ -1,5 +1,9 @@
 import { useState, useRef } from 'react'
 import { BackupService } from '../services/BackupService'
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Alert } from '../components/ui/Alert'
+import { PageHeader } from '../components/ui/PageHeader'
 
 export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
@@ -81,105 +85,120 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight sm:text-3xl">Settings</h1>
-        <p className="text-slate-400 text-sm mt-1 max-w-2xl">
-          Manage your local storage. Export full backups, restore from an existing backup, or completely reset your database.
-        </p>
-      </div>
+      <PageHeader
+        title="Settings"
+        description="Protect and manage the study data stored locally in this browser."
+      />
 
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl divide-y divide-slate-800">
+      <Alert variant="info" role="status">
+        <div>
+          <span className="font-semibold">Your data stays on this device.</span>{' '}
+          Export a backup regularly if you want a portable copy or plan to clear browser storage.
+        </div>
+      </Alert>
 
+      <Card className="divide-y divide-border-subtle">
         {/* Export Backup */}
         <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-center md:justify-between md:space-y-0 gap-4">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-200">Export Backup</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-text-main">Export Backup</h2>
+            <p className="text-sm text-text-muted">
               Download a complete JSON backup of all subjects, questions, and attempt history.
             </p>
           </div>
-          <button
+          <Button
             onClick={handleExport}
             disabled={isExporting}
-            className="shrink-0 inline-flex items-center justify-center px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-lg text-sm transition-colors border border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+            variant="secondary"
+            className="shrink-0"
           >
             {isExporting ? 'Exporting...' : 'Download JSON Backup'}
-          </button>
+          </Button>
         </div>
 
         {/* Restore Backup */}
         <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-start md:justify-between md:space-y-0 gap-4">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-slate-200">Restore Backup</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-text-main">Restore Backup</h2>
+            <p className="text-sm text-text-muted">
               Upload a valid backup file to replace all current data.
-              <br className="hidden md:block"/>
-              <strong className="text-rose-400 font-medium">Warning:</strong> This will erase any current data not in the backup.
+              <br className="hidden md:block"/>{' '}
+              <strong className="text-danger-text font-medium">Warning:</strong> This will erase any current data not in the backup.
             </p>
             {importStatus && (
-              <div className={`text-sm mt-2 font-medium ${importStatus.type === 'success' ? 'text-emerald-400' : 'text-rose-400'}`}>
+              <Alert variant={importStatus.type === 'success' ? 'success' : 'danger'} className="mt-4">
                 {importStatus.message}
-              </div>
+              </Alert>
             )}
           </div>
-          <div className="shrink-0 relative">
+          <div className="shrink-0">
             <input
               type="file"
               accept=".json,application/json"
               ref={fileInputRef}
               onChange={handleImportFile}
               disabled={isImporting}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+              tabIndex={-1}
+              aria-hidden="true"
+              className="sr-only"
               title="Select backup file"
             />
-            <button
+            <Button
               type="button"
               disabled={isImporting}
-              className="inline-flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-semibold rounded-lg text-sm transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50"
+              variant="primary"
+              onClick={() => fileInputRef.current?.click()}
             >
               {isImporting ? 'Restoring...' : 'Select Backup File'}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* Factory Reset */}
-        <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-center md:justify-between md:space-y-0 gap-4">
+      </Card>
+
+      {/* Factory Reset */}
+      <Card className="border-danger-border bg-danger-bg/20">
+        <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-center md:justify-between md:space-y-0 gap-5">
           <div className="space-y-1">
-            <h2 className="text-lg font-bold text-rose-400">Danger Zone: Reset Database</h2>
-            <p className="text-sm text-slate-400">
+            <h2 className="text-lg font-semibold text-danger-text">Danger Zone: Reset Database</h2>
+            <p className="text-sm text-text-muted">
               Permanently delete all subjects, topics, questions, and attempt history. This action cannot be undone unless you have a backup.
             </p>
           </div>
 
           {showResetConfirm ? (
-            <div className="shrink-0 flex items-center gap-3">
-              <span className="text-sm font-bold text-rose-400">Are you sure?</span>
-              <button
-                onClick={() => setShowResetConfirm(false)}
-                disabled={isResetting}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-sm font-semibold transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isResetting}
-                className="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-sm font-bold transition-colors shadow disabled:opacity-50"
-              >
-                {isResetting ? 'Resetting...' : 'Yes, Delete Everything'}
-              </button>
+            <div className="w-full shrink-0 space-y-2 md:w-auto">
+              <span className="block text-sm font-semibold text-danger-text">Are you sure?</span>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  onClick={() => setShowResetConfirm(false)}
+                  disabled={isResetting}
+                  variant="secondary"
+                  size="sm"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleReset}
+                  disabled={isResetting}
+                  variant="danger"
+                  size="sm"
+                >
+                  {isResetting ? 'Resetting...' : 'Yes, Delete Everything'}
+                </Button>
+              </div>
             </div>
           ) : (
-            <button
+            <Button
               onClick={() => setShowResetConfirm(true)}
-              className="shrink-0 inline-flex items-center justify-center px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 font-bold rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-rose-500"
+              variant="outline"
+              className="shrink-0 text-danger-text border-danger-border hover:bg-danger-bg hover:text-danger-text hover:border-danger-border"
             >
               Reset Database
-            </button>
+            </Button>
           )}
         </div>
-
-      </div>
+      </Card>
     </div>
   )
 }
