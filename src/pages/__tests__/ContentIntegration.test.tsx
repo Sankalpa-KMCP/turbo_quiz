@@ -176,7 +176,7 @@ describe('Content Integration (E2E Authoring)', () => {
       expect(screen.getByText('Biology')).toBeInTheDocument()
     })
 
-    const quizSubjectSelect = screen.getByLabelText(/Subject \*/i)
+    const quizSubjectSelect = screen.getByLabelText(/^Subject/)
     fireEvent.change(quizSubjectSelect, { target: { value: screen.getByText('Biology').closest('option')?.value } })
 
     // Wait for "Available questions: 2" to indicate 2 questions total

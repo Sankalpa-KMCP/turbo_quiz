@@ -101,7 +101,7 @@ describe('History and Dashboard Integration', () => {
       expect(screen.getByText('Biology')).toBeInTheDocument()
     })
 
-    const quizSubSelect = screen.getByLabelText(/Subject \*/i)
+    const quizSubSelect = screen.getByLabelText(/^Subject/)
     fireEvent.change(quizSubSelect, { target: { value: String(sub.id) } })
     await waitFor(() => expect(screen.getByText(/Available questions:/)).toHaveTextContent('2'))
 

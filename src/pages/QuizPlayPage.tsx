@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import { useQuizSessionStore } from '../stores/quizSessionStore'
 
-import { Card } from '../components/ui/Card'
 import { Button } from '../components/ui/Button'
 import { Alert } from '../components/ui/Alert'
 import { Badge } from '../components/ui/Badge'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { cn } from '../utils/cn'
 
 export default function QuizPlayPage() {
@@ -33,9 +33,7 @@ export default function QuizPlayPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const finishTriggerRef = useRef<HTMLButtonElement>(null)
-  const cancelBtnRef = useRef<HTMLButtonElement>(null)
 
-  // Timer effect
   useEffect(() => {
     if (phase !== 'playing' || !sessionStartedAt) return
     const update = () => {
@@ -47,22 +45,6 @@ export default function QuizPlayPage() {
     return () => clearInterval(interval)
   }, [phase, sessionStartedAt])
 
-  useEffect(() => {
-    if (!showConfirm) return
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        closeConfirm()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [showConfirm])
-
-  // Redirect to setup if no active playing session exists
   if (phase !== 'playing' && phase !== 'completing' && phase !== 'completed') {
     return <Navigate to="/quiz/setup" replace />
   }
@@ -86,18 +68,15 @@ export default function QuizPlayPage() {
 
   function openConfirm() {
     setSubmitError(null)
+    // Ensure the Finish control owns focus before the dialog opens so
+    // ConfirmDialog can restore it on cancel/Escape (jsdom clicks do not focus).
+    finishTriggerRef.current?.focus()
     setShowConfirm(true)
-    setTimeout(() => {
-      cancelBtnRef.current?.focus()
-    }, 0)
   }
 
   function closeConfirm() {
     setShowConfirm(false)
     setSubmitError(null)
-    setTimeout(() => {
-      finishTriggerRef.current?.focus()
-    }, 0)
   }
 
   async function confirmFinish() {
@@ -116,44 +95,62 @@ export default function QuizPlayPage() {
   }
 
   const unansweredCount = questions.filter(
-    (q) => answers[q.questionId]?.selectedOptionIndex === null
+    (q) => answers[q.questionId]?.selectedOptionIndex === null,
   ).length
+  const answeredCount = questions.length - unansweredCount
   const progressPercentage = Math.round(((currentIndex + 1) / questions.length) * 100)
+  const isCorrectSelection =
+    isAnswered && selectedIndex === currentQuestion.questionSnapshot.correctOptionIndex
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      {/* Quiz Header */}
-      <Card className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 p-4 sm:p-6">
-        <div>
-          <Badge variant="primary" className="capitalize mb-2">
-            {mode} Mode
-          </Badge>
-          <h1 className="text-xl font-bold text-text-main">
-            {subjectNameSnap}
-            {topicNameSnap && <span className="text-text-muted font-medium"> • {topicNameSnap}</span>}
-          </h1>
-        </div>
-        <div className="flex min-h-11 items-center gap-2 bg-surface-overlay border border-border-strong px-4 py-2 rounded-xl text-text-main" aria-label={`Elapsed time ${formatTime(elapsedSeconds)}`}>
-          <svg className="w-5 h-5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="font-mono font-bold text-lg">{formatTime(elapsedSeconds)}</span>
-        </div>
-      </Card>
-
-      {/* Main Question view */}
-      <Card className="p-4 sm:p-6 space-y-6">
-        <div className="flex justify-between items-center text-sm text-text-muted border-b border-border-subtle pb-4">
-          <span>Question {currentIndex + 1} of {questions.length}</span>
-          <span className="capitalize px-2 py-0.5 rounded bg-surface-overlay text-text-main text-xs">
-            {currentQuestion.questionSnapshot.difficulty}
-          </span>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <header className="space-y-4 border-b border-border-subtle pb-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0 space-y-2">
+            <Badge variant="primary" className="capitalize">
+              {mode} Mode
+            </Badge>
+            <h1 className="font-serif text-xl font-semibold tracking-tight text-text-main sm:text-2xl">
+              {subjectNameSnap}
+              {topicNameSnap ? (
+                <span className="font-sans text-base font-medium text-text-muted">
+                  {' '}
+                  · {topicNameSnap}
+                </span>
+              ) : null}
+            </h1>
+          </div>
+          <p
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border-subtle bg-surface-raised px-3 font-mono text-base font-semibold text-text-main"
+            aria-label={`Elapsed time ${formatTime(elapsedSeconds)}`}
+          >
+            <svg className="size-4 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span aria-hidden="true">{formatTime(elapsedSeconds)}</span>
+          </p>
         </div>
 
         <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-text-muted">
+            <p>
+              Question{' '}
+              <span className="font-semibold text-text-main">
+                {currentIndex + 1}
+              </span>{' '}
+              of {questions.length}
+              <span aria-hidden="true"> · </span>
+              <span className="capitalize">{currentQuestion.questionSnapshot.difficulty}</span>
+            </p>
+            <p>
+              {answeredCount} answered
+              <span aria-hidden="true"> · </span>
+              {unansweredCount} remaining
+            </p>
+          </div>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-overlay">
             <div
-              className="h-full rounded-full bg-primary-base transition-[width]"
+              className="h-full rounded-full bg-primary-base transition-[width] motion-reduce:transition-none"
               style={{ width: `${progressPercentage}%` }}
               role="progressbar"
               aria-label="Quiz progress"
@@ -164,31 +161,40 @@ export default function QuizPlayPage() {
           </div>
           <p className="sr-only">{progressPercentage}% through this quiz</p>
         </div>
+      </header>
 
-        {/* Question Text */}
-        <h2 className="text-lg font-semibold text-text-main whitespace-pre-wrap">
+      <section className="space-y-6" aria-labelledby="current-question-heading">
+        <h2
+          id="current-question-heading"
+          className="font-serif text-lg font-semibold leading-relaxed tracking-tight text-text-main whitespace-pre-wrap sm:text-xl"
+        >
           {currentQuestion.questionSnapshot.questionText}
         </h2>
 
-        {/* Options */}
-        <div className="space-y-3">
+        <div className="space-y-2" role="group" aria-label="Answer options">
           {currentQuestion.questionSnapshot.options.map((option, idx) => {
             const isSelected = selectedIndex === idx
             const isCorrectAnswer = idx === currentQuestion.questionSnapshot.correctOptionIndex
+            const feedbackActive = showsFeedback && isAnswered
 
-            let optionStyle = 'bg-surface-raised hover:bg-surface-overlay/80 border-border-subtle text-text-main'
-            if (isSelected) {
-              optionStyle = 'bg-primary-base/10 border-primary-base text-primary-text'
+            let optionStyle =
+              'border-border-subtle bg-surface-raised text-text-main hover:border-border-strong hover:bg-surface-overlay'
+            let statusLabel: string | null = null
+
+            if (isSelected && !feedbackActive) {
+              optionStyle = 'border-primary-base bg-primary-bg text-primary-text'
+              statusLabel = 'Selected'
             }
 
-            // Feedback Mode
-            if (showsFeedback && isAnswered) {
+            if (feedbackActive) {
               if (isCorrectAnswer) {
-                optionStyle = 'bg-success-bg border-success-border text-success-text font-medium'
+                optionStyle = 'border-success-border bg-success-bg text-success-text'
+                statusLabel = 'Correct answer'
               } else if (isSelected) {
-                optionStyle = 'bg-danger-bg border-danger-border text-danger-text'
+                optionStyle = 'border-danger-border bg-danger-bg text-danger-text'
+                statusLabel = 'Your answer'
               } else {
-                optionStyle = 'bg-surface-raised/50 border-border-subtle/50 text-text-muted/60 opacity-60'
+                optionStyle = 'border-border-subtle/70 bg-surface-raised text-text-muted opacity-70'
               }
             }
 
@@ -199,168 +205,142 @@ export default function QuizPlayPage() {
                 onClick={() => selectAnswer(idx)}
                 disabled={showsFeedback && isAnswered}
                 className={cn(
-                  'w-full text-left p-4 rounded-xl border transition-all cursor-pointer flex justify-between items-center outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base',
-                  optionStyle
+                  'flex w-full min-h-14 items-start justify-between gap-3 rounded-lg border px-4 py-3 text-left text-sm transition-colors',
+                  'outline-none focus-visible:ring-2 focus-visible:ring-border-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface-base',
+                  'disabled:cursor-default',
+                  optionStyle,
                 )}
                 aria-pressed={isSelected}
               >
-                <span>{option}</span>
-                {showsFeedback && isAnswered && (
-                  <span>
-                    {isCorrectAnswer && (
-                      <svg className="w-5 h-5 text-success-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
-                    {isSelected && !isCorrectAnswer && (
-                      <svg className="w-5 h-5 text-danger-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    )}
+                <span className="min-w-0 flex-1 whitespace-pre-wrap leading-relaxed">{option}</span>
+                {statusLabel ? (
+                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wider">
+                    {statusLabel}
                   </span>
-                )}
+                ) : null}
               </button>
             )
           })}
         </div>
 
-        {/* Feedback Mode Explanation */}
-        {showsFeedback && isAnswered && currentQuestion.questionSnapshot.explanation && (
-          <div className="bg-success-bg/20 border border-success-border/30 p-4 rounded-xl space-y-2 mt-4">
-            <h4 className="text-sm font-semibold text-success-text">Explanation</h4>
-            <p className="text-sm text-text-main whitespace-pre-wrap">
-              {currentQuestion.questionSnapshot.explanation}
-            </p>
+        {showsFeedback && isAnswered ? (
+          <div className="space-y-3" aria-live="polite">
+            <Alert variant={isCorrectSelection ? 'success' : 'danger'}>
+              {isCorrectSelection ? 'Correct.' : 'Incorrect.'}
+            </Alert>
+            {currentQuestion.questionSnapshot.explanation ? (
+              <div className="rounded-lg border border-border-subtle bg-surface-raised px-4 py-3">
+                <h3 className="text-sm font-semibold text-text-main">Explanation</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-text-main whitespace-pre-wrap">
+                  {currentQuestion.questionSnapshot.explanation}
+                </p>
+              </div>
+            ) : null}
           </div>
-        )}
-      </Card>
+        ) : null}
+      </section>
 
-      {/* Navigation and Actions or Inline Confirmation */}
-      {showConfirm ? (
-        <Card
-          role="dialog"
-          aria-modal="true"
-          className="p-6 space-y-4 focus:outline-none border-primary-base/50 ring-2 ring-primary-base/20"
-          aria-labelledby="confirm-heading"
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border-subtle pt-5">
+        <Button
+          onClick={previousQuestion}
+          disabled={currentIndex === 0}
+          variant="secondary"
+          size="sm"
         >
-          <div className="space-y-2">
-            <h3 id="confirm-heading" className="text-lg font-bold text-text-main">Finish Quiz</h3>
-            <p className="text-sm text-text-muted">
-              Are you sure you want to finish the quiz?
-              {unansweredCount > 0 && (
-                <span className="block text-warning-text font-semibold mt-1">
-                  You have {unansweredCount} unanswered question{unansweredCount > 1 ? 's' : ''}.
-                </span>
-              )}
-            </p>
-          </div>
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-            <Button
-              ref={cancelBtnRef}
-              onClick={closeConfirm}
-              disabled={isSubmitting}
-              variant="secondary"
-              size="sm"
-            >
-              Cancel
+          Previous
+        </Button>
+
+        <div className="flex flex-wrap gap-2">
+          {!isAnswered ? (
+            <Button onClick={skipQuestion} variant="secondary" size="sm">
+              Skip
             </Button>
+          ) : null}
+
+          {isLastQuestion ? (
             <Button
-              onClick={confirmFinish}
-              disabled={isSubmitting}
+              ref={finishTriggerRef}
+              onClick={openConfirm}
               variant="primary"
               size="sm"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Answers'}
+              Finish Quiz
             </Button>
-          </div>
-        </Card>
-      ) : (
-        <Card className="flex flex-wrap justify-between items-center gap-3 p-3 sm:p-4">
-          <Button
-            onClick={previousQuestion}
-            disabled={currentIndex === 0}
-            variant="secondary"
-            size="sm"
-          >
-            Previous
-          </Button>
+          ) : (
+            <Button onClick={nextQuestion} variant="primary" size="sm">
+              Next
+            </Button>
+          )}
+        </div>
+      </div>
 
-          <div className="flex gap-2">
-            {!isAnswered && (
-              <Button
-                onClick={skipQuestion}
-                variant="secondary"
-                size="sm"
-              >
-                Skip
-              </Button>
-            )}
-
-            {isLastQuestion ? (
-              <Button
-                ref={finishTriggerRef}
-                onClick={openConfirm}
-                variant="primary"
-                size="sm"
-              >
-                Finish Quiz
-              </Button>
-            ) : (
-              <Button
-                onClick={nextQuestion}
-                variant="primary"
-                size="sm"
-              >
-                Next
-              </Button>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* Question Progress Navigator Grid */}
-      <Card className="p-6 space-y-3">
+      <nav className="space-y-3 border-t border-border-subtle pt-5" aria-label="Question navigator">
         <h3 className="text-sm font-semibold text-text-main">Question Navigator</h3>
-        <div className="flex flex-wrap gap-2.5">
+        <ul className="flex flex-wrap gap-2">
           {questions.map((q, idx) => {
             const ans = answers[q.questionId]
             const isCurrent = idx === currentIndex
             const isQAnswered = ans?.selectedOptionIndex !== null
             const isQSkipped = ans?.selectedOptionIndex === null && ans?.timeTakenSeconds > 0
 
-            let style = 'bg-surface-raised text-text-muted hover:bg-surface-overlay border-border-subtle'
+            let style = 'border-border-subtle bg-surface-raised text-text-muted hover:bg-surface-overlay'
+            let stateLabel = 'unanswered'
             if (isCurrent) {
-              style = 'bg-primary-base/10 border-primary-base text-primary-text font-bold ring-2 ring-primary-base/50'
+              style = 'border-primary-base bg-primary-bg text-primary-text ring-2 ring-primary-base/40'
+              stateLabel = 'current'
             } else if (isQAnswered) {
-              style = 'bg-primary-base text-text-inverse border-primary-base'
+              style = 'border-primary-base bg-primary-base text-text-inverse'
+              stateLabel = 'answered'
             } else if (isQSkipped) {
-              style = 'bg-surface-raised border-warning-border/50 text-warning-text'
+              style = 'border-warning-border bg-warning-bg text-warning-text'
+              stateLabel = 'skipped'
             }
 
             return (
-              <Button
-                key={idx}
-                onClick={() => goToQuestion(idx)}
-                variant="ghost"
-                className={cn(
-                  'size-11 rounded-xl border flex items-center justify-center text-sm font-semibold transition-all p-0 shadow-none',
-                  style
-                )}
-                aria-current={isCurrent ? 'step' : undefined}
-              >
-                {idx + 1}
-              </Button>
+              <li key={q.questionId}>
+                <Button
+                  onClick={() => goToQuestion(idx)}
+                  variant="ghost"
+                  className={cn(
+                    'size-11 rounded-lg border p-0 text-sm font-semibold shadow-none',
+                    style,
+                  )}
+                  aria-label={`Question ${idx + 1}, ${stateLabel}`}
+                  aria-current={isCurrent ? 'step' : undefined}
+                >
+                  <span aria-hidden="true">{idx + 1}</span>
+                </Button>
+              </li>
             )
           })}
-        </div>
-      </Card>
+        </ul>
+      </nav>
 
-      {/* Completion Error display */}
       {(submitError || storeError) && (
         <Alert variant="danger">
           {submitError || storeError}
         </Alert>
       )}
+
+      <ConfirmDialog
+        open={showConfirm}
+        title="Finish Quiz"
+        description={
+          <>
+            <p>Are you sure you want to finish the quiz?</p>
+            {unansweredCount > 0 ? (
+              <p className="mt-2 font-semibold text-warning-text">
+                You have {unansweredCount} unanswered question{unansweredCount > 1 ? 's' : ''}.
+              </p>
+            ) : null}
+          </>
+        }
+        confirmLabel="Submit Answers"
+        cancelLabel="Cancel"
+        pending={isSubmitting || phase === 'completing'}
+        onConfirm={confirmFinish}
+        onCancel={closeConfirm}
+      />
     </div>
   )
 }

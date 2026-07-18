@@ -209,7 +209,6 @@ describe('QuizPlayPage', () => {
   })
 
   it('handles accessible focus movement and Escape closure', async () => {
-    vi.useFakeTimers()
     const container = document.createElement('div')
     document.body.appendChild(container)
 
@@ -254,31 +253,28 @@ describe('QuizPlayPage', () => {
     expect(finishBtn).toBeInTheDocument()
 
     // 1. Click finish opens confirmation and focuses Cancel button
+    finishBtn.focus()
     fireEvent.click(finishBtn)
-    vi.runOnlyPendingTimers()
 
     const cancelBtn = screen.getByRole('button', { name: /Cancel/i })
     expect(document.activeElement).toBe(cancelBtn)
 
     // 2. Escape key closes confirmation and returns focus to finish button
     fireEvent.keyDown(window, { key: 'Escape', code: 'Escape' })
-    vi.runOnlyPendingTimers()
 
     expect(screen.queryByRole('heading', { name: /Finish Quiz/i })).not.toBeInTheDocument()
     const finishBtnAfter = screen.getByRole('button', { name: /Finish Quiz/i })
     expect(document.activeElement).toBe(finishBtnAfter)
 
     // 3. Cancel button click closes confirmation and returns focus
+    finishBtnAfter.focus()
     fireEvent.click(finishBtnAfter)
-    vi.runOnlyPendingTimers()
     const cancelBtn2 = screen.getByRole('button', { name: /Cancel/i })
     fireEvent.click(cancelBtn2)
-    vi.runOnlyPendingTimers()
 
     expect(screen.queryByRole('heading', { name: /Finish Quiz/i })).not.toBeInTheDocument()
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Finish Quiz/i }))
 
-    vi.useRealTimers()
     document.body.removeChild(container)
   })
 

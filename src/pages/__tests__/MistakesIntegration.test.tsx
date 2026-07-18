@@ -90,7 +90,7 @@ describe('Mistakes Integration', () => {
     await waitFor(() => expect(router.state.location.pathname).toBe('/quiz/setup'))
     await waitFor(() => expect(screen.getByText('Geography')).toBeInTheDocument())
 
-    const quizSubSelect = screen.getByLabelText(/Subject \*/i)
+    const quizSubSelect = screen.getByLabelText(/^Subject/)
     fireEvent.change(quizSubSelect, { target: { value: String(sub.id) } })
 
     const quizTopicSelect = screen.getByLabelText(/Topic/i)
