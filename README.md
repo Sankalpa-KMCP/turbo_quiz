@@ -1,75 +1,111 @@
 # TurboQuiz
 
-TurboQuiz is a private, local-first quiz preparation and practice Single Page Application (SPA) designed to provide a focused, calm study environment. All data is kept strictly inside the user's browser, enabling full offline usability.
+TurboQuiz is a private, local-first quiz preparation and practice Single Page Application (SPA). It is built as a calm study workspace: all subjects, questions, attempts, and backups stay in the browser, with full offline usability and no accounts, servers, or telemetry.
+
+## Quiet Study Desk
+
+The UI follows a light-first **Quiet Study Desk** visual direction:
+
+- **Cool paper** surface (`#f4f6f8`) as the default page background
+- **Near-black ink** (`#15202b`) for primary text
+- **Steel teal** (`#0f766e`, hover `#115e59`) as the single accent for primary actions, focus, and selected states
+- Restrained borders, radii, elevation, and badge shapes — prefer divider-led lists and sectioned layout over card-heavy dashboards
+- Semantic design tokens in `src/index.css` (`surface-*`, `text-*`, `primary-*`, status colors); prefer tokens over arbitrary palette utilities
+
+There is no dark theme in the application.
+
+### Typography (offline)
+
+Titles and study reading content use **Source Serif 4**. Application chrome uses **IBM Plex Sans**. Both families are self-hosted as latin WOFF2 files under `src/assets/fonts/`, loaded with `font-display: swap` and system fallbacks declared in `src/index.css`.
+
+| Family | Role | License |
+|---|---|---|
+| Source Serif 4 | Page titles and study-oriented reading | SIL Open Font License 1.1 — `src/assets/fonts/licenses/SOURCE-SERIF-4-LICENSE.md` |
+| IBM Plex Sans | UI chrome and controls | SIL Open Font License 1.1 — `src/assets/fonts/licenses/IBM-PLEX-SANS-LICENSE.txt` |
+
+See also `src/assets/fonts/README.md`.
 
 ## Product Overview & Workflows
 
-- **Local-First Privacy**: No user accounts, backend servers, database servers, or telemetry tracking. All information belongs entirely to the local device.
-- **Content Authoring**: Organize your study materials by creating **Subjects**, nested **Topics**, and customized **Questions** with dynamic option fields, correct answer mappings, and learning explanations.
+- **Local-First Privacy**: No user accounts, backend servers, or telemetry. Data belongs to the local device and browser origin.
+- **Content Authoring**: Organize study materials with **Subjects**, nested **Topics**, and **Questions** (options, correct answers, explanations).
 - **Quiz Sessions**:
   - **Setup**: Choose a subject, topic, and quiz mode.
-  - **Practice Mode**: Provides immediate feedback (correct/incorrect answer highlights) and displays explanation text as you answer.
-  - **Exam Mode**: Simulates actual exam conditions with no immediate correctness cues or explanations.
-- **Mistakes Review**: Incorrectly answered questions are automatically projected to the Mistakes panel, allowing you to retry incorrect groups or clear them by answering correctly.
-- **Analytics & History**: Track aggregated metrics (accuracy, completed count, total time spent) via progress bars and recent attempts, with filters on the History review page.
-- **Backup & Safety**: Clear database resets or backup restore procedures can be performed under Settings.
+  - **Practice Mode**: Immediate correctness feedback and explanations after each answer.
+  - **Exam Mode**: No correctness cues or explanations until results.
+- **Mistakes Review**: Incorrect answers project to Mistakes; retry groups or clear items by answering correctly.
+- **History & Dashboard**: Recent attempts, filters, and aggregated local metrics.
+- **Backup & Safety**: JSON export, validate-and-restore, and full database reset under Settings (in-app confirmation required).
+
+### Navigation notes
+
+Routes are unchanged. A few UX details worth knowing:
+
+- `/questions` without a `subjectId` query shows an inline **subject picker** when subjects exist.
+- `/quiz/play` uses a **focused shell** (no primary navigation chrome) so the session stays front-and-center.
+- Quiz Results (`/quiz/results/:attemptId`) remain under the **History** navigation context.
 
 ---
 
 ## Technology Stack
 
-- **Framework**: React 19 (v19.2.7)
-- **Tooling & Build**: Vite 8 (v8.1.1) & TypeScript
-- **Styling**: Tailwind CSS 4 (v4.3.2) utilizing semantic tokens
-- **Local Persistence**: Dexie.js (v4.4.4) over IndexedDB
-- **State Management**: Zustand (v5.0.14) for quiz session state machines
-- **Form Management**: React Hook Form (v7.81.0) & Zod (v4.4.3)
-- **Test Framework**: Vitest (v4.1.10) & Testing Library
+- **Framework**: React 19
+- **Tooling & Build**: Vite 8 & TypeScript
+- **Styling**: Tailwind CSS 4 with semantic tokens
+- **Local Persistence**: Dexie over IndexedDB
+- **State Management**: Zustand for quiz session state
+- **Form Management**: React Hook Form & Zod
+- **PWA**: vite-plugin-pwa (`registerType: 'prompt'`)
+- **Test Framework**: Vitest & Testing Library (`fileParallelism: false`)
 
 ---
 
 ## Setup and Development
 
 ### Prerequisites
-- [Node.js](https://nodejs.org) (Recommended: LTS version. No specific node engine is pinned in package.json)
+
+- [Node.js](https://nodejs.org) (LTS recommended; no `engines` field is pinned in `package.json`)
 
 ### Installation
-Install project dependencies using your package manager:
+
 ```bash
 npm install
 ```
 
 ### Running Development Server
-Start the local server (Vite):
+
 ```bash
 npm run dev
 ```
 
 ### Production Build
-Compile TypeScript and build the production-ready assets:
+
 ```bash
 npm run build
 ```
 
 ### Preview Production Build
-Run a local server to preview the built application:
+
 ```bash
 npm run preview
 ```
 
 ### Running Tests
-Execute the full test suite in parallel:
+
+Vitest is configured with `fileParallelism: false` (see `vite.config.ts`) so IndexedDB-backed suites stay isolated:
+
 ```bash
 npm run test
 ```
 
-For continuous watch mode during development:
+Watch mode:
+
 ```bash
 npm run test:watch
 ```
 
 ### Linting
-Validate code style and syntax matching ESLint rule definitions:
+
 ```bash
 npm run lint
 ```
@@ -79,41 +115,66 @@ npm run lint
 ## Local Data & Safety
 
 > [!WARNING]
-> Since TurboQuiz stores all databases locally within IndexedDB, clearing your browser's site data, clearing the application's stored database, or deleting IndexedDB records will permanently remove all subjects, questions, and attempt history. Regular HTTP browser cache clearing (for static assets) does not affect IndexedDB databases.
+> TurboQuiz stores all application data in IndexedDB. Clearing site data, resetting the in-app database, or deleting IndexedDB records permanently removes subjects, questions, and attempt history. Clearing the ordinary HTTP cache for static assets does not remove IndexedDB data.
 
-- **Backup Export**: Before performing destructive actions, go to **Settings** and click **Export Backup** to save a JSON snapshot of your data to your local machine.
-- **Restore Backup**: Overwrites the current local database with contents of a selected backup file.
-- **Reset Database**: Clears all records in the local browser IndexedDB. This action is irreversible.
+- **Download JSON Backup**: Under Settings, use **Download JSON Backup** to save a portable snapshot before destructive actions. There is no cloud account or server-side recovery.
+- **Restore Backup**: Validates the selected JSON backup, then **replaces** all current local application data with the backup contents. Requires in-app confirmation.
+- **Reset Database**: Removes all locally stored TurboQuiz tables. Irreversible except for a prior export. Requires in-app confirmation.
+
+Destructive flows use the shared `ConfirmDialog` (not native `alert` / `confirm`). Status feedback uses in-app `Alert` surfaces.
 
 ---
 
 ## UI Architecture & Contribution Guidelines
 
-- **Semantic Tokens**: Styled custom attributes (such as surfaces, text, overlays, and status alerts) are defined as semantic CSS properties inside `src/index.css`. Avoid hardcoded Tailwind palette overrides (e.g. `bg-slate-900`) in favor of tokens like `bg-surface-raised`.
-- **UI Primitives**: All shared controls and surfaces must utilize the reusable primitives located in `src/components/ui/` (`Button`, `Input`, `Textarea`, `Select`, `Card`, `Badge`, `Alert`).
-- **Layout Shell**:
-  - The desktop layout and responsive mobile drawers are managed in `src/components/layout/AppLayout.tsx`.
-  - Global error triggers are captured by `src/components/layout/GlobalErrorBoundary.tsx`.
-- **Keyboard Navigation & Accessibility**:
-  - Always maintain high-contrast focus rings (`focus-visible:ring-2 focus-visible:ring-border-focus`).
-  - Active elements must be distinguished by visual markers (borders/weights) in addition to colors.
-  - The mobile drawer menu must trap tab key focus, exit on `Escape` key, and restore focus back to the menu trigger button.
-  - Form validations must bind to the `aria-invalid` attribute and include description IDs.
+Semantic tokens and shared primitives live under `src/index.css` and `src/components/ui/`. Prefer tokens and primitives over one-off styling.
+
+| Primitive | Intended use |
+|---|---|
+| `Button` / `buttonStyles` | Primary, secondary, danger, and ghost actions; reuse `buttonStyles` when you need link/button chrome without the component |
+| `Input`, `Select`, `Textarea` | Base form controls |
+| `Field` | Labels, helper text, required/optional indication, and validation errors (`aria-invalid` / `aria-describedby`) |
+| `ConfirmDialog` | Modal confirmations for destructive or consequential actions (focus trap, Escape, pending state) |
+| `Card` | Interactive or grouped content containers when a surface is truly needed — avoid decorative card stacks |
+| `Badge` | Compact status or mode labels |
+| `Alert` | Inline success, warning, danger, and info feedback |
+| `PageHeader` | Consistent page title and supporting copy |
+| `LoadingState` | In-page loading copy |
+| `EmptyState` | Empty lists and first-run guidance |
+
+Contribution rules:
+
+- Repeated page chrome should use `PageHeader`, `LoadingState`, and `EmptyState`.
+- Form labels, helpers, and errors should use `Field`.
+- Confirmations for covered flows should use `ConfirmDialog`; do not add native blocking `alert` / `confirm` for those flows.
+- Prefer semantic tokens (`bg-surface-raised`, `text-text-muted`, `border-border-focus`, …) over hardcoded palette utilities.
+- Keep focus rings (`focus-visible:ring-2 focus-visible:ring-border-focus`) and non-color state cues (borders, weights, text).
+- Mobile drawer: trap focus, dismiss on Escape, restore focus to the menu trigger (`AppLayout`).
+
+Layout shell: `src/components/layout/AppLayout.tsx`. Global render errors: `GlobalErrorBoundary`. PWA update prompt: `ReloadPrompt`.
+
+For redesign decisions and validation notes aimed at maintainers, see [`docs/UI_REDESIGN_HANDOVER.md`](docs/UI_REDESIGN_HANDOVER.md).
 
 ---
 
 ## Deployment & PWA Notes
 
-- **Hosting Requirements**: Since this is a Single Page Application (SPA), ensure your static hosting provider (Vercel, Netlify, GitHub Pages, etc.) is configured to route all unknown path requests back to `index.html` to support client-side deep links and reloads.
-- **PWA Assets**: Progressive Web App manifests and workbox cache workers are pre-configured. Icon assets (`pwa-192x192.png`, `pwa-512x512.png`, and `favicon.svg`) are stored within the `/public` root folder.
+- **Hosting**: This is an SPA. Configure the static host so unknown paths fall back to `index.html` (deep links and reloads).
+- **PWA**: `vite-plugin-pwa` registers a service worker with `registerType: 'prompt'`. Manifest theme/background colors match Quiet Study Desk (`#0f766e` / `#f4f6f8`).
+- **Static assets** present under `public/`:
+  - `favicon.svg`
+  - `pwa-192x192.png`
+  - `pwa-512x512.png`
+  - `icons.svg`
+
+There is no in-repository provider-specific deploy config (no `vercel.json` / `netlify.toml`) and no CI workflow in this repository.
 
 ---
 
 ## Known Limitations
 
-- **No Device Sync**: Since data is stored client-side in browser storage, progress is not synchronized across different devices or profiles.
-- **Single-User Workspace**: There is no multi-user profile separation or built-in authentication support.
-- **Node.js Environment**: The project does not pin a specific minimum Node.js or npm version inside engine configurations.
-- **No Remote Database**: The database exists entirely as a local indexed storage inside the current client origin.
-- **No CI/CD Integration**: No GitHub Actions or automated CI/CD pipeline configurations are set up.
-- **No Deployment Configuration**: There is no provider-specific hosting file (e.g., `vercel.json` or `netlify.toml`) included in the project template.
+- Browser-local data only — no account, multi-device sync, or application backend.
+- Restore fully replaces existing local data; reset clears all local TurboQuiz tables.
+- No repository CI/CD pipeline.
+- No in-repository production-host deployment configuration; SPA hosts still need fallback routing.
+- Node.js / npm versions are not pinned via `engines`.
