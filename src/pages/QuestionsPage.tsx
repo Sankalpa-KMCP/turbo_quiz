@@ -9,6 +9,15 @@ import type { TopicFilter } from '../db/repositories/QuestionRepository'
 import type { BookmarkStatus, Difficulty } from '../types/db'
 import { useDebounce } from '../utils/useDebounce'
 
+import { Card } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
+import { Select } from '../components/ui/Select'
+import { Input } from '../components/ui/Input'
+import { buttonStyles } from '../components/ui/buttonStyles'
+import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingState } from '../components/ui/LoadingState'
+import { PageHeader } from '../components/ui/PageHeader'
+
 const subjectRepo = new SubjectRepository(db)
 const topicRepo = new TopicRepository(db)
 const questionRepo = new QuestionRepository(db)
@@ -82,28 +91,35 @@ export default function QuestionsPage() {
 
   if (!isValidSubjectId) {
     return (
-      <div className="max-w-5xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold text-slate-100">Invalid Subject ID</h1>
-        <p className="text-slate-400">Questions must be viewed within a valid subject.</p>
-        <Link to="/subjects" className="text-indigo-400 hover:underline">Go to Subjects</Link>
+      <div className="max-w-5xl mx-auto space-y-6">
+        <PageHeader
+          title="Questions Bank"
+          description="Questions are organized inside subjects so your practice sessions stay focused."
+        />
+        <EmptyState
+          title="Choose a subject first"
+          description="Open a subject to browse, search, create, and edit the questions in its bank."
+          icon={
+            <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 14h.01M16 10h.01M9 18l-4 3v-4a8 8 0 1114.5-4.7" />
+            </svg>
+          }
+          action={<Link to="/subjects" className={buttonStyles({ variant: 'primary' })}>Browse subjects</Link>}
+        />
       </div>
     )
   }
 
   if (subject === undefined) {
-    return (
-      <div className="max-w-5xl mx-auto space-y-4">
-        <div className="text-slate-400 text-sm">Loading...</div>
-      </div>
-    )
+    return <LoadingState label="Loading question bank…" />
   }
 
   if (subject === null) {
     return (
       <div className="max-w-5xl mx-auto space-y-4">
-        <h1 className="text-2xl font-bold text-slate-100">Subject Not Found</h1>
-        <p className="text-slate-400">The subject you are looking for does not exist.</p>
-        <Link to="/subjects" className="text-indigo-400 hover:underline">Go to Subjects</Link>
+        <h1 className="text-2xl font-bold text-text-main">Subject Not Found</h1>
+        <p className="text-text-muted">The subject you are looking for does not exist.</p>
+        <Link to="/subjects" className="text-primary-text hover:underline">Go to Subjects</Link>
       </div>
     )
   }
@@ -122,91 +138,93 @@ export default function QuestionsPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <Link to={`/subjects/${subject.id}`} className="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-colors inline-flex items-center gap-1 mb-2">
+      <PageHeader
+        title="Questions Bank"
+        description={`${questions?.length || 0} question${questions?.length === 1 ? '' : 's'} found in ${subject.name}`}
+        eyebrow={
+          <Link to={`/subjects/${subject.id}`} className="inline-flex min-h-9 items-center gap-1 rounded-lg text-sm font-medium text-primary-text transition-colors hover:text-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
             Back to {subject.name}
           </Link>
-          <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight sm:text-3xl">Questions Bank</h1>
-          <p className="text-slate-400 text-sm mt-1">{questions?.length || 0} Questions Found</p>
-        </div>
-        <Link
-          to={`/questions/new?subjectId=${subject.id}${topicIdParam && topicIdParam !== 'uncategorized' ? `&topicId=${topicIdParam}` : ''}`}
-          className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-slate-100 font-bold rounded-xl text-sm cursor-pointer transition-colors whitespace-nowrap"
-        >
-          + Create Question
-        </Link>
-      </div>
+        }
+        action={
+          <Link
+            to={`/questions/new?subjectId=${subject.id}${topicIdParam && topicIdParam !== 'uncategorized' ? `&topicId=${topicIdParam}` : ''}`}
+            className={buttonStyles({ variant: 'primary' })}
+          >
+            + Create Question
+          </Link>
+        }
+      />
 
       {/* Filters Toolbar */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col md:flex-row gap-4">
+      <Card className="p-4 flex flex-col md:flex-row gap-4">
         <div className="flex-1 w-full relative">
           <label htmlFor="search-q" className="sr-only">Search text</label>
-          <input
+          <Input
             id="search-q"
-            type="text"
             value={searchText}
             onChange={e => setSearchText(e.target.value)}
             placeholder="Search questions..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
           />
         </div>
         <div className="flex flex-wrap gap-3">
           <div className="flex-1 min-w-[120px]">
             <label htmlFor="filter-topic" className="sr-only">Topic</label>
-            <select
+            <Select
               id="filter-topic"
               value={topicIdParam || ''}
               onChange={e => handleFilterChange('topicId', e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
             >
               <option value="">All Topics</option>
               <option value="uncategorized">Uncategorized</option>
               {topics?.map(t => (
                 <option key={t.id} value={t.id}>{t.name}</option>
               ))}
-            </select>
+            </Select>
           </div>
           <div className="flex-1 min-w-[110px]">
             <label htmlFor="filter-difficulty" className="sr-only">Difficulty</label>
-            <select
+            <Select
               id="filter-difficulty"
               value={difficultyParam || ''}
               onChange={e => handleFilterChange('difficulty', e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
             >
               <option value="">All Difficulties</option>
               <option value="easy">Easy</option>
               <option value="medium">Medium</option>
               <option value="hard">Hard</option>
-            </select>
+            </Select>
           </div>
           <div className="flex-1 min-w-[110px]">
             <label htmlFor="filter-bookmark" className="sr-only">Bookmarks</label>
-            <select
+            <Select
               id="filter-bookmark"
               value={bookmarkParam || ''}
               onChange={e => handleFilterChange('bookmark', e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
             >
               <option value="">All Questions</option>
               <option value="1">Bookmarked</option>
-            </select>
+            </Select>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* List */}
       {questions === undefined ? (
-        <div className="text-center py-12 text-slate-500">Loading questions...</div>
+        <LoadingState compact label="Loading questions…" />
       ) : questions.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 sm:p-12 text-center">
-          <p className="text-slate-400 text-lg">No questions match your filters.</p>
-        </div>
+        <EmptyState
+          title="No questions match your filters."
+          description="Clear or adjust the filters above, or create a new question in this subject."
+          icon={
+            <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 4a7 7 0 105.3 11.6L21 20.3M11 8v3m0 3h.01" />
+            </svg>
+          }
+        />
       ) : (
         <div className="space-y-4">
           {questions.map(q => {
@@ -214,32 +232,30 @@ export default function QuestionsPage() {
             const topicName = t ? t.name : 'Uncategorized'
 
             return (
-              <div key={q.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 transition-all hover:border-slate-700 flex flex-col sm:flex-row gap-4 sm:items-start">
+              <Card key={q.id} className="p-4 sm:p-6 transition-all hover:border-border-strong flex flex-col sm:flex-row gap-4 sm:items-start">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
-                    <span className="px-2 py-0.5 bg-slate-800 rounded text-xs font-semibold text-slate-300">
+                    <Badge variant="default">
                       {topicName}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                      q.difficulty === 'easy' ? 'bg-emerald-500/10 text-emerald-400' :
-                      q.difficulty === 'medium' ? 'bg-amber-500/10 text-amber-400' :
-                      'bg-rose-500/10 text-rose-400'
-                    }`}>
+                    </Badge>
+                    <Badge variant={q.difficulty === 'easy' ? 'success' : q.difficulty === 'medium' ? 'warning' : 'danger'} className="uppercase tracking-wider">
                       {q.difficulty}
-                    </span>
+                    </Badge>
                   </div>
-                  <h3 className="text-lg font-medium text-slate-100 whitespace-pre-wrap break-words">{q.questionText}</h3>
+                  <h3 className="text-lg font-medium text-text-main whitespace-pre-wrap break-words">{q.questionText}</h3>
                 </div>
 
                 <div className="flex sm:flex-col gap-2 shrink-0">
                   <button
                     type="button"
                     title={q.bookmarkStatus === 1 ? "Remove Bookmark" : "Bookmark"}
+                    aria-label={q.bookmarkStatus === 1 ? 'Remove bookmark' : 'Bookmark question'}
+                    aria-pressed={q.bookmarkStatus === 1}
                     onClick={() => toggleBookmark(q.id, q.bookmarkStatus)}
-                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer transition-colors group flex items-center justify-center"
+                    className="inline-flex size-11 items-center justify-center bg-surface-overlay hover:bg-border-strong text-text-main rounded-xl cursor-pointer transition-colors group border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                   >
                     <svg
-                      className={`w-5 h-5 ${q.bookmarkStatus === 1 ? 'fill-amber-400 text-amber-400' : 'fill-none stroke-current group-hover:text-amber-400 group-hover:stroke-current'}`}
+                      className={`w-5 h-5 ${q.bookmarkStatus === 1 ? 'fill-warning-text text-warning-text' : 'fill-none stroke-current group-hover:text-warning-text group-hover:stroke-current'}`}
                       viewBox="0 0 24 24"
                       strokeWidth={2}
                     >
@@ -248,7 +264,7 @@ export default function QuestionsPage() {
                   </button>
                   <Link
                     to={`/questions/${q.id}/edit`}
-                    className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl cursor-pointer transition-colors flex items-center justify-center"
+                    className="inline-flex size-11 items-center justify-center bg-surface-overlay hover:bg-border-strong text-text-main rounded-xl cursor-pointer transition-colors border border-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-border-focus"
                     title="Edit Question"
                   >
                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -256,7 +272,7 @@ export default function QuestionsPage() {
                     </svg>
                   </Link>
                 </div>
-              </div>
+              </Card>
             )
           })}
         </div>

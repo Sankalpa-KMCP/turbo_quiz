@@ -12,6 +12,14 @@ import { subjectCreateSchema, subjectUpdateSchema } from '../schemas/subjectSche
 import { DuplicateNameError, ValidationError } from '../db/errors'
 import type { Subject } from '../types/db'
 
+import { Card } from '../components/ui/Card'
+import { Button } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Alert } from '../components/ui/Alert'
+import { EmptyState } from '../components/ui/EmptyState'
+import { LoadingState } from '../components/ui/LoadingState'
+import { PageHeader } from '../components/ui/PageHeader'
+
 const subjectRepo = new SubjectRepository(db)
 const topicRepo = new TopicRepository(db)
 const questionRepo = new QuestionRepository(db)
@@ -147,53 +155,58 @@ export default function SubjectsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
-      <div>
-        <h1 className="text-2xl font-extrabold text-slate-100 tracking-tight sm:text-3xl">Subjects</h1>
-        <p className="text-slate-400 text-sm mt-1">
-          Manage the subjects you want to practice.
-        </p>
-      </div>
+      <PageHeader
+        title="Subjects"
+        description="Organize your study library, then add topics and questions inside each subject."
+      />
 
       {actionError && (
-        <div role="alert" className="bg-rose-500/10 border border-rose-500/30 text-rose-400 px-4 py-3 rounded-xl text-sm">
+        <Alert variant="danger">
           {actionError}
-        </div>
+        </Alert>
       )}
 
       {/* Create Form */}
-      <form onSubmit={handleCreateSubmit(onCreate)} className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-        <div className="flex-1 w-full">
-          <label htmlFor="create-name" className="block text-sm font-medium text-slate-300 mb-1">
-            New Subject Name
-          </label>
-          <input
-            id="create-name"
-            type="text"
-            {...registerCreate('name')}
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-            placeholder="e.g. Mathematics"
-          />
-          {createErrors.name && (
-            <p className="text-rose-400 text-xs mt-1">{createErrors.name.message}</p>
-          )}
-        </div>
-        <button
-          type="submit"
-          disabled={isCreating}
-          className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-slate-100 font-bold rounded-xl text-sm transition-colors cursor-pointer"
-        >
-          {isCreating ? 'Creating...' : 'Create Subject'}
-        </button>
-      </form>
+      <Card className="p-4">
+        <form onSubmit={handleCreateSubmit(onCreate)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+          <div className="flex-1 w-full">
+            <label htmlFor="create-name" className="block text-sm font-medium text-text-main mb-1">
+              New Subject Name
+            </label>
+            <Input
+              id="create-name"
+              {...registerCreate('name')}
+              hasError={!!createErrors.name}
+              placeholder="e.g. Mathematics"
+            />
+            {createErrors.name && (
+              <p className="text-danger-text text-xs mt-1">{createErrors.name.message}</p>
+            )}
+          </div>
+          <Button
+            type="submit"
+            disabled={isCreating}
+            className="w-full sm:w-auto"
+          >
+            {isCreating ? 'Creating...' : 'Create Subject'}
+          </Button>
+        </form>
+      </Card>
 
       {/* List */}
       <div className="space-y-4">
         {isLoading ? (
-          <div className="text-slate-400 text-sm p-4 text-center">Loading subjects...</div>
+          <LoadingState compact label="Loading subjects…" />
         ) : subjects.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-            <p className="text-slate-400 text-sm">No subjects found. Create one to get started.</p>
-          </div>
+          <EmptyState
+            title="No subjects found"
+            description="Use the form above to create your first subject and begin building a focused question bank."
+            icon={
+              <svg className="size-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 19.5A2.5 2.5 0 016.5 17H20M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z" />
+              </svg>
+            }
+          />
         ) : (
           subjects.map((sub) => {
             const isEditingThis = editingId === sub.id
@@ -201,7 +214,7 @@ export default function SubjectsPage() {
             const stats = subjectStats?.[sub.id] || { topics: 0, questions: 0 }
 
             return (
-              <div key={sub.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 transition-all hover:border-slate-700">
+              <Card key={sub.id} className="p-4 sm:p-6 transition-all hover:border-border-strong">
                 {isDeletingThis ? (
                   <div
                     role="dialog"
@@ -211,81 +224,82 @@ export default function SubjectsPage() {
                     tabIndex={-1}
                   >
                     <div className="space-y-2">
-                      <h3 id={`delete-heading-${sub.id}`} className="text-lg font-bold text-slate-100">
+                      <h3 id={`delete-heading-${sub.id}`} className="text-lg font-bold text-text-main">
                         Delete Subject: {sub.name}
                       </h3>
-                      <p className="text-sm text-slate-400">
+                      <p className="text-sm text-text-muted">
                         Are you sure you want to delete this subject?
-                        <span className="block text-rose-400 font-semibold mt-1">
+                        <span className="block text-danger-text font-semibold mt-1">
                           This will permanently delete {stats.topics} topic(s) and {stats.questions} question(s). Historical quiz snapshots will be preserved.
                         </span>
                       </p>
                     </div>
                     <div className="flex gap-3 justify-end">
-                      <button
+                      <Button
                         ref={cancelRef}
                         type="button"
                         onClick={cancelDelete}
                         disabled={isSubmittingAction}
-                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm cursor-pointer transition-colors"
+                        variant="secondary"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={executeDelete}
                         disabled={isSubmittingAction}
-                        className="px-4 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-slate-100 font-bold rounded-xl text-sm cursor-pointer transition-colors"
+                        variant="danger"
                       >
                         {isSubmittingAction ? 'Deleting...' : 'Confirm Delete'}
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : isEditingThis ? (
                   <form onSubmit={handleEditSubmit(onEdit)} className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                     <div className="flex-1 w-full">
                       <label htmlFor={`edit-name-${sub.id}`} className="sr-only">Subject Name</label>
-                      <input
+                      <Input
                         id={`edit-name-${sub.id}`}
-                        type="text"
                         {...registerEdit('name')}
-                        className="w-full bg-slate-950 border border-indigo-500 rounded-xl px-4 py-2 text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-colors"
+                        hasError={!!editErrors.name}
                         autoFocus
                       />
                       {editErrors.name && (
-                        <p className="text-rose-400 text-xs mt-1">{editErrors.name.message}</p>
+                        <p className="text-danger-text text-xs mt-1">{editErrors.name.message}</p>
                       )}
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto">
-                      <button
+                      <Button
                         type="button"
                         onClick={cancelEditing}
                         disabled={isEditing}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold rounded-xl text-sm cursor-pointer transition-colors"
+                        variant="secondary"
+                        className="flex-1 sm:flex-none"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="submit"
                         disabled={isEditing}
-                        className="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-slate-100 font-bold rounded-xl text-sm cursor-pointer transition-colors"
+                        variant="primary"
+                        className="flex-1 sm:flex-none"
                       >
                         {isEditing ? 'Saving...' : 'Save'}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 ) : (
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex-1">
                       <Link to={`/subjects/${sub.id}`} className="group">
-                        <h2 className="text-xl font-bold text-slate-100 group-hover:text-indigo-400 transition-colors flex items-center gap-2">
+                        <h2 className="text-xl font-bold text-text-main group-hover:text-primary-text transition-colors flex items-center gap-2">
                           {sub.name}
                           <svg className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                           </svg>
                         </h2>
                       </Link>
-                      <div className="flex items-center gap-4 mt-2 text-xs font-medium text-slate-500">
+                      <div className="flex items-center gap-4 mt-2 text-xs font-medium text-text-muted">
                         <span className="flex items-center gap-1">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
@@ -301,24 +315,27 @@ export default function SubjectsPage() {
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <button
+                      <Button
                         type="button"
                         onClick={() => startEditing(sub)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg text-xs cursor-pointer transition-colors"
+                        variant="secondary"
+                        size="sm"
                       >
                         Edit
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
                         onClick={() => confirmDelete(sub.id)}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-medium rounded-lg text-xs cursor-pointer transition-colors"
+                        variant="ghost"
+                        size="sm"
+                        className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
                       >
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
-              </div>
+              </Card>
             )
           })
         )}
