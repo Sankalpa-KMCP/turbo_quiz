@@ -1,72 +1,79 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import SettingsPage from '../SettingsPage'
 import { BackupService } from '../../services/BackupService'
 
-// Mock the service
 vi.mock('../../services/BackupService', () => ({
   BackupService: {
     exportBackup: vi.fn(),
     validateBackup: vi.fn(),
     restoreBackup: vi.fn(),
-    resetDatabase: vi.fn()
-  }
+    resetDatabase: vi.fn(),
+  },
 }))
 
-// Mock URL.createObjectURL and revokeObjectURL
 const mockCreateObjectURL = vi.fn()
 const mockRevokeObjectURL = vi.fn()
 URL.createObjectURL = mockCreateObjectURL
 URL.revokeObjectURL = mockRevokeObjectURL
 
-// Mock window.confirm
-const mockConfirm = vi.spyOn(window, 'confirm')
-
-// Mock window.location.reload
 const mockReload = vi.fn()
 Object.defineProperty(window, 'location', {
   value: { reload: mockReload },
-  writable: true
+  writable: true,
 })
+
+const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+const confirmSpy = vi.spyOn(window, 'confirm').mockImplementation(() => true)
+
+function renderSettings() {
+  return render(
+    <MemoryRouter>
+      <SettingsPage />
+    </MemoryRouter>,
+  )
+}
+
+async function selectBackupFile(contents = '{"version":1}', name = 'backup.json') {
+  const fileInput = screen.getByLabelText(/Select backup file/i)
+  const file = new File([contents], name, { type: 'application/json' })
+  fireEvent.change(fileInput, { target: { files: [file] } })
+}
 
 describe('SettingsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockConfirm.mockReturnValue(true) // Default to true for confirm
+    alertSpy.mockClear()
+    confirmSpy.mockClear()
   })
 
-  it('renders the Settings layout', () => {
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    )
+  it('renders Quiet Study Desk settings sections', () => {
+    renderSettings()
 
-    expect(screen.getByRole('heading', { name: /Settings/i })).toBeInTheDocument()
-    expect(screen.getByText(/Export Backup/i)).toBeInTheDocument()
-    expect(screen.getByText(/Restore Backup/i)).toBeInTheDocument()
-    expect(screen.getByText(/Danger Zone: Reset Database/i)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /^Settings$/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Export backup/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Restore backup/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Local privacy/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Reset database/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Download JSON Backup/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Select Backup File/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reset Database/i })).toBeInTheDocument()
   })
 
-  it('handles export backup successfully', async () => {
+  it('exports backup successfully with in-app feedback and without native alert', async () => {
     vi.mocked(BackupService.exportBackup).mockResolvedValue('{"version":1}')
     mockCreateObjectURL.mockReturnValue('blob:mock-url')
 
-    // Capture appended anchors
     const appendSpy = vi.spyOn(document.body, 'appendChild')
     const removeSpy = vi.spyOn(document.body, 'removeChild')
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    )
+    renderSettings()
 
     const exportBtn = screen.getByRole('button', { name: /Download JSON Backup/i })
     fireEvent.click(exportBtn)
 
-    expect(exportBtn).toHaveTextContent(/Exporting.../i)
+    expect(exportBtn).toHaveTextContent(/Exporting/i)
 
     await waitFor(() => {
       expect(BackupService.exportBackup).toHaveBeenCalled()
@@ -78,101 +85,265 @@ describe('SettingsPage', () => {
 
     await waitFor(() => {
       expect(mockRevokeObjectURL).toHaveBeenCalled()
+      expect(screen.getByText(/Backup downloaded/i)).toBeInTheDocument()
     })
+
+    expect(alertSpy).not.toHaveBeenCalled()
   })
 
-  it('handles file import successfully', async () => {
-    vi.mocked(BackupService.validateBackup).mockResolvedValue({ version: 1 } as unknown as import('../../schemas/backupSchema').BackupDataV1)
-    vi.mocked(BackupService.restoreBackup).mockResolvedValue()
+  it('reports export failure through in-app alert without native dialogs', async () => {
+    vi.mocked(BackupService.exportBackup).mockRejectedValue(new Error('disk full'))
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    )
+    renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: /Download JSON Backup/i }))
 
-    // The file input
-    const fileInput = screen.getByTitle('Select backup file')
-    const file = new File(['{"version":1}'], 'backup.json', { type: 'application/json' })
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/Failed to export backup/i)
+    })
 
-    fireEvent.change(fileInput, { target: { files: [file] } })
+    expect(alertSpy).not.toHaveBeenCalled()
+  })
+
+  it('validates a selected file then opens restore confirmation', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+
+    renderSettings()
+    await selectBackupFile('{"version":1}', 'study-backup.json')
 
     await waitFor(() => {
       expect(BackupService.validateBackup).toHaveBeenCalledWith('{"version":1}')
-      expect(mockConfirm).toHaveBeenCalled()
+      expect(screen.getByRole('dialog', { name: /Replace local data/i })).toBeInTheDocument()
+      expect(screen.getAllByText(/study-backup\.json/i).length).toBeGreaterThan(0)
+    })
+
+    expect(BackupService.restoreBackup).not.toHaveBeenCalled()
+    expect(confirmSpy).not.toHaveBeenCalled()
+  })
+
+  it('cancels restore from the dialog without calling restore', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+
+    renderSettings()
+    const selectBtn = screen.getByRole('button', { name: /Select Backup File/i })
+    selectBtn.focus()
+    await selectBackupFile()
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    expect(BackupService.restoreBackup).not.toHaveBeenCalled()
+    expect(selectBtn).toHaveFocus()
+    expect(confirmSpy).not.toHaveBeenCalled()
+  })
+
+  it('cancels restore with Escape and restores focus', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+
+    renderSettings()
+    const selectBtn = screen.getByRole('button', { name: /Select Backup File/i })
+    selectBtn.focus()
+    await selectBackupFile()
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    fireEvent.keyDown(window, { key: 'Escape' })
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    expect(BackupService.restoreBackup).not.toHaveBeenCalled()
+    expect(selectBtn).toHaveFocus()
+  })
+
+  it('confirms restore, replaces data, and shows success feedback', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+    vi.mocked(BackupService.restoreBackup).mockResolvedValue()
+
+    renderSettings()
+    await selectBackupFile()
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /Replace local data/i }))
+
+    await waitFor(() => {
       expect(BackupService.restoreBackup).toHaveBeenCalledWith({ version: 1 })
-      expect(screen.getByText(/Backup restored successfully!/i)).toBeInTheDocument()
+      expect(screen.getByText(/Backup restored successfully/i)).toBeInTheDocument()
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
+
+    expect(alertSpy).not.toHaveBeenCalled()
+    expect(confirmSpy).not.toHaveBeenCalled()
   })
 
-  it('aborts import if confirm is cancelled', async () => {
-    mockConfirm.mockReturnValue(false)
-    vi.mocked(BackupService.validateBackup).mockResolvedValue({ version: 1 } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+  it('keeps the restore dialog open and shows failure feedback when restore fails', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+    vi.mocked(BackupService.restoreBackup).mockRejectedValue(new Error('Write failed'))
 
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    )
-
-    const fileInput = screen.getByTitle('Select backup file')
-    const file = new File(['{"version":1}'], 'backup.json', { type: 'application/json' })
-
-    fireEvent.change(fileInput, { target: { files: [file] } })
+    renderSettings()
+    await selectBackupFile()
 
     await waitFor(() => {
-      expect(BackupService.validateBackup).toHaveBeenCalled()
-      expect(mockConfirm).toHaveBeenCalled()
-      expect(BackupService.restoreBackup).not.toHaveBeenCalled()
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
     })
-  })
 
-  it('displays error if import validation fails', async () => {
-    vi.mocked(BackupService.validateBackup).mockRejectedValue(new Error('Invalid JSON format'))
-
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
-    )
-
-    const fileInput = screen.getByTitle('Select backup file')
-    const file = new File(['bad'], 'backup.json', { type: 'application/json' })
-
-    fireEvent.change(fileInput, { target: { files: [file] } })
+    fireEvent.click(screen.getByRole('button', { name: /Replace local data/i }))
 
     await waitFor(() => {
-      expect(BackupService.validateBackup).toHaveBeenCalled()
-      expect(screen.getByText(/Invalid JSON format/i)).toBeInTheDocument()
+      expect(BackupService.restoreBackup).toHaveBeenCalled()
+      const dialog = screen.getByRole('dialog')
+      expect(within(dialog).getByText(/Write failed/i)).toBeInTheDocument()
     })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 
-  it('handles database reset', async () => {
-    vi.mocked(BackupService.resetDatabase).mockResolvedValue()
-    // mock window alert
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-
-    render(
-      <MemoryRouter>
-        <SettingsPage />
-      </MemoryRouter>
+  it('disables duplicate restore confirmation while pending', async () => {
+    let resolveRestore!: () => void
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+    vi.mocked(BackupService.restoreBackup).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveRestore = () => resolve()
+        }),
     )
 
-    // Initial reset button
-    const initResetBtn = screen.getByRole('button', { name: /Reset Database/i })
-    fireEvent.click(initResetBtn)
+    renderSettings()
+    await selectBackupFile()
 
-    // Confirm UI appears
-    expect(screen.getByText(/Are you sure\?/i)).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+    })
 
-    // Confirm button
-    const confirmBtn = screen.getByRole('button', { name: /Yes, Delete Everything/i })
+    const confirmBtn = screen.getByRole('button', { name: /Replace local data/i })
     fireEvent.click(confirmBtn)
 
     await waitFor(() => {
+      expect(confirmBtn).toBeDisabled()
+      expect(confirmBtn).toHaveAttribute('aria-busy', 'true')
+    })
+
+    fireEvent.click(confirmBtn)
+    expect(BackupService.restoreBackup).toHaveBeenCalledTimes(1)
+
+    resolveRestore()
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  it('displays validation errors without opening the restore dialog', async () => {
+    vi.mocked(BackupService.validateBackup).mockRejectedValue(new Error('Invalid JSON format'))
+
+    renderSettings()
+    await selectBackupFile('bad')
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent(/Invalid JSON format/i)
+    })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(BackupService.restoreBackup).not.toHaveBeenCalled()
+  })
+
+  it('opens reset confirmation with Cancel as initial focus', async () => {
+    renderSettings()
+    const resetBtn = screen.getByRole('button', { name: /Reset Database/i })
+    resetBtn.focus()
+    fireEvent.click(resetBtn)
+
+    const dialog = await screen.findByRole('dialog', { name: /Delete all local data/i })
+    expect(within(dialog).getByRole('button', { name: /^Cancel$/i })).toHaveFocus()
+  })
+
+  it('cancels reset without calling resetDatabase', async () => {
+    renderSettings()
+    const resetBtn = screen.getByRole('button', { name: /Reset Database/i })
+    resetBtn.focus()
+    fireEvent.click(resetBtn)
+
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /^Cancel$/i }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    expect(BackupService.resetDatabase).not.toHaveBeenCalled()
+    expect(resetBtn).toHaveFocus()
+  })
+
+  it('confirms reset, clears data, and reloads without native dialogs', async () => {
+    vi.mocked(BackupService.resetDatabase).mockResolvedValue()
+
+    renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: /Reset Database/i }))
+
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /Delete all local data/i }))
+
+    await waitFor(() => {
       expect(BackupService.resetDatabase).toHaveBeenCalled()
-      expect(alertSpy).toHaveBeenCalledWith('Database has been completely reset.')
       expect(mockReload).toHaveBeenCalled()
     })
+
+    expect(alertSpy).not.toHaveBeenCalled()
+    expect(confirmSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps the reset dialog open when reset fails', async () => {
+    vi.mocked(BackupService.resetDatabase).mockRejectedValue(new Error('reset boom'))
+
+    renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: /Reset Database/i }))
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: /Delete all local data/i }))
+
+    await waitFor(() => {
+      expect(within(screen.getByRole('dialog')).getByText(/Failed to reset database/i)).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(mockReload).not.toHaveBeenCalled()
+  })
+
+  it('allows only one destructive dialog at a time', async () => {
+    vi.mocked(BackupService.validateBackup).mockResolvedValue({
+      version: 1,
+    } as unknown as import('../../schemas/backupSchema').BackupDataV1)
+
+    renderSettings()
+    await selectBackupFile()
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog', { name: /Replace local data/i })).toBeInTheDocument()
+    })
+
+    expect(screen.getByRole('button', { name: /Reset Database/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Download JSON Backup/i })).toBeDisabled()
   })
 })

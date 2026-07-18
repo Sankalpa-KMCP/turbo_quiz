@@ -1,22 +1,52 @@
-import { useState, useRef } from 'react'
+import { useRef, useState } from 'react'
 import { BackupService } from '../services/BackupService'
-import { Card } from '../components/ui/Card'
-import { Button } from '../components/ui/Button'
+import { type BackupDataV1 } from '../schemas/backupSchema'
 import { Alert } from '../components/ui/Alert'
+import { Button } from '../components/ui/Button'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { PageHeader } from '../components/ui/PageHeader'
+
+type Feedback = {
+  type: 'success' | 'error'
+  message: string
+} | null
+
+type ActiveDialog = 'restore' | 'reset' | null
 
 export default function SettingsPage() {
   const [isExporting, setIsExporting] = useState(false)
-  const [isImporting, setIsImporting] = useState(false)
-  const [importStatus, setImportStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
-  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [isRestoring, setIsRestoring] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
+  const [feedback, setFeedback] = useState<Feedback>(null)
+  const [activeDialog, setActiveDialog] = useState<ActiveDialog>(null)
+  const [pendingBackup, setPendingBackup] = useState<BackupDataV1 | null>(null)
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const selectFileButtonRef = useRef<HTMLButtonElement>(null)
+  const resetButtonRef = useRef<HTMLButtonElement>(null)
+
+  const clearFileInput = () => {
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const closeRestoreDialog = () => {
+    if (isRestoring) return
+    setActiveDialog(null)
+    setPendingBackup(null)
+    setSelectedFileName(null)
+    clearFileInput()
+  }
+
+  const closeResetDialog = () => {
+    if (isResetting) return
+    setActiveDialog(null)
+  }
 
   const handleExport = async () => {
     try {
       setIsExporting(true)
+      setFeedback(null)
       const jsonStr = await BackupService.exportBackup()
       const blob = new Blob([jsonStr], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
@@ -28,9 +58,17 @@ export default function SettingsPage() {
       a.click()
       document.body.removeChild(a)
       setTimeout(() => URL.revokeObjectURL(url), 100)
+
+      setFeedback({
+        type: 'success',
+        message: 'Backup downloaded. Keep this file somewhere safe if you may clear browser storage.',
+      })
     } catch (err) {
       console.error('Export failed:', err)
-      alert('Failed to export backup.')
+      setFeedback({
+        type: 'error',
+        message: 'Failed to export backup. Try again in a moment.',
+      })
     } finally {
       setIsExporting(false)
     }
@@ -41,50 +79,81 @@ export default function SettingsPage() {
     if (!file) return
 
     try {
-      setIsImporting(true)
-      setImportStatus(null)
-
+      setFeedback(null)
       const text = await file.text()
       const validatedData = await BackupService.validateBackup(text)
 
-      if (!window.confirm('This will completely replace all your current subjects, questions, and history with the backup data. Continue?')) {
-        setIsImporting(false)
-        if (fileInputRef.current) fileInputRef.current.value = ''
-        return
-      }
-
-      await BackupService.restoreBackup(validatedData)
-      setImportStatus({ type: 'success', message: 'Backup restored successfully!' })
-
-      // Clear the input
-      if (fileInputRef.current) fileInputRef.current.value = ''
+      setPendingBackup(validatedData)
+      setSelectedFileName(file.name)
+      selectFileButtonRef.current?.focus()
+      setActiveDialog('restore')
     } catch (err) {
       console.error('Import failed:', err)
-      setImportStatus({
+      setPendingBackup(null)
+      setSelectedFileName(null)
+      clearFileInput()
+      setFeedback({
         type: 'error',
-        message: err instanceof Error ? err.message : 'Invalid backup file.'
+        message: err instanceof Error ? err.message : 'Invalid backup file.',
       })
-    } finally {
-      setIsImporting(false)
     }
   }
 
-  const handleReset = async () => {
+  const handleConfirmRestore = async () => {
+    if (!pendingBackup || isRestoring) return
+
+    try {
+      setIsRestoring(true)
+      setFeedback(null)
+      await BackupService.restoreBackup(pendingBackup)
+      setActiveDialog(null)
+      setPendingBackup(null)
+      setSelectedFileName(null)
+      clearFileInput()
+      setFeedback({
+        type: 'success',
+        message: 'Backup restored successfully. Your previous local data was replaced.',
+      })
+    } catch (err) {
+      console.error('Import failed:', err)
+      setFeedback({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Failed to restore backup.',
+      })
+    } finally {
+      setIsRestoring(false)
+    }
+  }
+
+  const openResetDialog = () => {
+    resetButtonRef.current?.focus()
+    setActiveDialog('reset')
+  }
+
+  const handleConfirmReset = async () => {
+    if (isResetting) return
+
     try {
       setIsResetting(true)
+      setFeedback(null)
       await BackupService.resetDatabase()
-      setShowResetConfirm(false)
-      alert('Database has been completely reset.')
+      setFeedback({
+        type: 'success',
+        message: 'All local data was removed. Reloading…',
+      })
       window.location.reload()
     } catch (err) {
       console.error('Reset failed:', err)
-      alert('Failed to reset database.')
+      setFeedback({
+        type: 'error',
+        message: 'Failed to reset database. Try again in a moment.',
+      })
       setIsResetting(false)
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="mx-auto max-w-3xl space-y-8">
       <PageHeader
         title="Settings"
         description="Protect and manage the study data stored locally in this browser."
@@ -92,113 +161,181 @@ export default function SettingsPage() {
 
       <Alert variant="info" role="status">
         <div>
-          <span className="font-semibold">Your data stays on this device.</span>{' '}
-          Export a backup regularly if you want a portable copy or plan to clear browser storage.
+          <span className="font-semibold text-text-main">Your data stays on this device.</span>{' '}
+          TurboQuiz does not sync to a cloud account. Export a backup if you want a portable copy
+          or may clear browser storage.
         </div>
       </Alert>
 
-      <Card className="divide-y divide-border-subtle">
-        {/* Export Backup */}
-        <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-center md:justify-between md:space-y-0 gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-text-main">Export Backup</h2>
-            <p className="text-sm text-text-muted">
-              Download a complete JSON backup of all subjects, questions, and attempt history.
+      {feedback && activeDialog === null ? (
+        <Alert
+          variant={feedback.type === 'success' ? 'success' : 'danger'}
+          role={feedback.type === 'success' ? 'status' : 'alert'}
+        >
+          {feedback.message}
+        </Alert>
+      ) : null}
+
+      <section aria-labelledby="settings-export-heading" className="space-y-4 border-b border-border-subtle pb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <h2 id="settings-export-heading" className="text-base font-semibold text-text-main">
+              Export backup
+            </h2>
+            <p className="text-sm leading-relaxed text-text-muted">
+              Download a complete JSON copy of subjects, topics, questions, and attempt history.
             </p>
           </div>
           <Button
             onClick={handleExport}
-            disabled={isExporting}
-            variant="secondary"
-            className="shrink-0"
+            disabled={isExporting || activeDialog !== null}
+            variant="primary"
+            className="w-full shrink-0 sm:w-auto"
           >
-            {isExporting ? 'Exporting...' : 'Download JSON Backup'}
+            {isExporting ? 'Exporting…' : 'Download JSON Backup'}
           </Button>
         </div>
+      </section>
 
-        {/* Restore Backup */}
-        <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-start md:justify-between md:space-y-0 gap-4">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-text-main">Restore Backup</h2>
-            <p className="text-sm text-text-muted">
-              Upload a valid backup file to replace all current data.
-              <br className="hidden md:block"/>{' '}
-              <strong className="text-danger-text font-medium">Warning:</strong> This will erase any current data not in the backup.
+      <section aria-labelledby="settings-restore-heading" className="space-y-4 border-b border-border-subtle pb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <h2 id="settings-restore-heading" className="text-base font-semibold text-text-main">
+              Restore backup
+            </h2>
+            <p id="restore-help" className="text-sm leading-relaxed text-text-muted">
+              Choose a valid TurboQuiz backup file. Restoring replaces all current local data with
+              the contents of that file.
             </p>
-            {importStatus && (
-              <Alert variant={importStatus.type === 'success' ? 'success' : 'danger'} className="mt-4">
-                {importStatus.message}
-              </Alert>
-            )}
+            {selectedFileName ? (
+              <p className="text-sm text-text-main">
+                <span className="font-medium">Selected file:</span>{' '}
+                <span className="break-all">{selectedFileName}</span>
+              </p>
+            ) : null}
           </div>
           <div className="shrink-0">
             <input
+              id="backup-restore-file"
               type="file"
               accept=".json,application/json"
               ref={fileInputRef}
               onChange={handleImportFile}
-              disabled={isImporting}
-              tabIndex={-1}
-              aria-hidden="true"
+              disabled={isRestoring || activeDialog !== null}
+              aria-label="Select backup file"
+              aria-describedby="restore-help"
               className="sr-only"
               title="Select backup file"
             />
             <Button
+              ref={selectFileButtonRef}
               type="button"
-              disabled={isImporting}
-              variant="primary"
+              disabled={isRestoring || activeDialog !== null}
+              variant="secondary"
+              className="w-full sm:w-auto"
               onClick={() => fileInputRef.current?.click()}
             >
-              {isImporting ? 'Restoring...' : 'Select Backup File'}
+              Select Backup File
             </Button>
           </div>
         </div>
+      </section>
 
-      </Card>
+      <section aria-labelledby="settings-privacy-heading" className="space-y-2 border-b border-border-subtle pb-8">
+        <h2 id="settings-privacy-heading" className="text-base font-semibold text-text-main">
+          Local privacy
+        </h2>
+        <p className="text-sm leading-relaxed text-text-muted">
+          Study content and quiz history remain in this browser&apos;s storage. Clearing site data,
+          switching browsers, or using another device will not carry that data unless you restore a
+          backup you exported.
+        </p>
+      </section>
 
-      {/* Factory Reset */}
-      <Card className="border-danger-border bg-danger-bg/20">
-        <div className="p-6 space-y-4 flex flex-col md:flex-row md:items-center md:justify-between md:space-y-0 gap-5">
-          <div className="space-y-1">
-            <h2 className="text-lg font-semibold text-danger-text">Danger Zone: Reset Database</h2>
-            <p className="text-sm text-text-muted">
-              Permanently delete all subjects, topics, questions, and attempt history. This action cannot be undone unless you have a backup.
+      <section aria-labelledby="settings-reset-heading" className="space-y-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-1">
+            <h2 id="settings-reset-heading" className="text-base font-semibold text-danger-text">
+              Reset database
+            </h2>
+            <p className="text-sm leading-relaxed text-text-muted">
+              Permanently delete all locally stored subjects, topics, questions, attempts, and
+              answers. This cannot be undone unless you have an exported backup.
             </p>
           </div>
-
-          {showResetConfirm ? (
-            <div className="w-full shrink-0 space-y-2 md:w-auto">
-              <span className="block text-sm font-semibold text-danger-text">Are you sure?</span>
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Button
-                  onClick={() => setShowResetConfirm(false)}
-                  disabled={isResetting}
-                  variant="secondary"
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleReset}
-                  disabled={isResetting}
-                  variant="danger"
-                  size="sm"
-                >
-                  {isResetting ? 'Resetting...' : 'Yes, Delete Everything'}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Button
-              onClick={() => setShowResetConfirm(true)}
-              variant="outline"
-              className="shrink-0 text-danger-text border-danger-border hover:bg-danger-bg hover:text-danger-text hover:border-danger-border"
-            >
-              Reset Database
-            </Button>
-          )}
+          <Button
+            ref={resetButtonRef}
+            type="button"
+            onClick={openResetDialog}
+            disabled={activeDialog !== null || isResetting}
+            variant="outline"
+            className="w-full shrink-0 border-danger-border text-danger-text hover:bg-danger-bg hover:text-danger-text sm:w-auto"
+          >
+            Reset Database
+          </Button>
         </div>
-      </Card>
+      </section>
+
+      <ConfirmDialog
+        open={activeDialog === 'restore'}
+        title="Replace local data?"
+        description={
+          <>
+            <p>
+              Restoring will completely replace all subjects, topics, questions, and quiz history
+              stored in this browser with the selected backup
+              {selectedFileName ? (
+                <>
+                  {' '}
+                  (<span className="break-all font-medium text-text-main">{selectedFileName}</span>)
+                </>
+              ) : null}
+              .
+            </p>
+            <p className="mt-2 font-semibold text-danger-text">
+              Any current data not present in the backup will be permanently removed.
+            </p>
+            {feedback?.type === 'error' && activeDialog === 'restore' ? (
+              <p className="mt-2 text-danger-text">{feedback.message}</p>
+            ) : null}
+          </>
+        }
+        confirmLabel="Replace local data"
+        cancelLabel="Cancel"
+        tone="destructive"
+        pending={isRestoring}
+        closeOnEscape={!isRestoring}
+        closeOnBackdrop={!isRestoring}
+        onConfirm={handleConfirmRestore}
+        onCancel={closeRestoreDialog}
+      />
+
+      <ConfirmDialog
+        open={activeDialog === 'reset'}
+        title="Delete all local data?"
+        description={
+          <>
+            <p>
+              This permanently removes every subject, topic, question, quiz attempt, and answer
+              stored in this browser.
+            </p>
+            <p className="mt-2 font-semibold text-danger-text">
+              This action cannot be undone unless you restore an exported backup afterward.
+            </p>
+            {feedback?.type === 'error' && activeDialog === 'reset' ? (
+              <p className="mt-2 text-danger-text">{feedback.message}</p>
+            ) : null}
+          </>
+        }
+        confirmLabel="Delete all local data"
+        cancelLabel="Cancel"
+        tone="destructive"
+        pending={isResetting}
+        closeOnEscape={!isResetting}
+        closeOnBackdrop={!isResetting}
+        onConfirm={handleConfirmReset}
+        onCancel={closeResetDialog}
+      />
     </div>
   )
 }

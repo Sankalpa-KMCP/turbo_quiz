@@ -1,20 +1,31 @@
 import { Link } from 'react-router-dom'
 import { buttonStyles } from '../components/ui/buttonStyles'
-import { Card } from '../components/ui/Card'
 
 export default function NotFoundPage() {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center text-center">
-      <Card className="w-full max-w-md p-8 sm:p-10">
-        <h1 className="text-4xl font-black text-danger-text tracking-tight">404</h1>
-        <h2 className="mt-4 text-xl font-bold text-text-main">Page Not Found</h2>
-        <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-text-muted">
-          The route you are looking for does not exist or has been moved.
-        </p>
-        <Link to="/" className={`${buttonStyles({ variant: 'primary' })} mt-6`}>
-          Go to Dashboard
-        </Link>
-      </Card>
+    <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 py-12 text-center">
+      <div className="w-full max-w-md space-y-6">
+        <p className="text-sm font-medium uppercase tracking-wider text-text-muted">404</p>
+        <div className="space-y-2">
+          <h1 className="font-serif text-3xl font-semibold tracking-tight text-text-main">
+            Page not found
+          </h1>
+          <p className="mx-auto max-w-sm text-sm leading-relaxed text-text-muted">
+            The route you are looking for does not exist or has been moved.
+          </p>
+        </div>
+        <div className="flex flex-col items-center gap-3">
+          <Link to="/" className={buttonStyles({ variant: 'primary' })}>
+            Go to Dashboard
+          </Link>
+          <Link
+            to="/subjects"
+            className="text-sm font-medium text-primary-text underline-offset-2 hover:underline focus:outline-none focus-visible:underline"
+          >
+            Browse subjects
+          </Link>
+        </div>
+      </div>
     </div>
   )
 }

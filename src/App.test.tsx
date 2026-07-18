@@ -64,8 +64,9 @@ describe('App Shell and Routing', () => {
     window.history.pushState({}, '', '/some-non-existent-route')
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: /404/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /Page Not Found/i })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /Page not found/i })).toBeInTheDocument()
+    expect(screen.getByText('404')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Go to Dashboard/i })).toBeInTheDocument()
   })
 
   it('toggles mobile menu open and close accessibly', () => {
