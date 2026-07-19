@@ -4,11 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "workspaces": [
-    "shared"
+    "shared",
+    "server"
   ],
   "scripts": {
     "dev": "vite",
     "build:shared": "npm run build --workspace=shared",
+    "build:server": "npm run build --workspace=server",
+    "test:server": "npm run test --workspace=server",
+    "start:server": "npm run start --workspace=server",
+    "dev:server": "npm run dev --workspace=server",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "test": "vitest run",
