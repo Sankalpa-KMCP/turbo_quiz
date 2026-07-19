@@ -18,7 +18,8 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:shared": "npm run test --workspace=shared"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
