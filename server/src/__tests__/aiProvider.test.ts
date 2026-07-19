@@ -65,6 +65,26 @@ describe("AI Configuration & Provider System", () => {
         process.env = originalEnv;
       }
     });
+
+    it("validates valid and invalid AI_REQUESTS_PER_MINUTE configurations", () => {
+      const originalEnv = { ...process.env };
+      try {
+        process.env.AI_REQUESTS_PER_MINUTE = "abc";
+        expect(() => validateAndLoadConfig()).toThrow(/AI_REQUESTS_PER_MINUTE must be a valid integer greater than zero/);
+
+        process.env.AI_REQUESTS_PER_MINUTE = "0";
+        expect(() => validateAndLoadConfig()).toThrow(/AI_REQUESTS_PER_MINUTE must be a valid integer greater than zero/);
+
+        process.env.AI_REQUESTS_PER_MINUTE = "-5";
+        expect(() => validateAndLoadConfig()).toThrow(/AI_REQUESTS_PER_MINUTE must be a valid integer greater than zero/);
+
+        process.env.AI_REQUESTS_PER_MINUTE = "15";
+        const config = validateAndLoadConfig();
+        expect(config.AI_REQUESTS_PER_MINUTE).toBe(15);
+      } finally {
+        process.env = originalEnv;
+      }
+    });
   });
 
   describe("Provider Factory", () => {
@@ -73,6 +93,7 @@ describe("AI Configuration & Provider System", () => {
         PORT: 3001,
         NODE_ENV: "test",
         AI_PROVIDER: "mock",
+        AI_REQUESTS_PER_MINUTE: 10,
       };
       const provider = createAiProvider(config);
       expect(provider).toBeInstanceOf(MockAiProvider);
@@ -83,6 +104,7 @@ describe("AI Configuration & Provider System", () => {
         PORT: 3001,
         NODE_ENV: "test",
         AI_PROVIDER: "invalid",
+        AI_REQUESTS_PER_MINUTE: 10,
       };
       expect(() => createAiProvider(config)).toThrow(/Unsupported AI provider: "invalid"/);
     });

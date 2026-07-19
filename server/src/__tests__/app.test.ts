@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import request from "supertest";
 import { createApp } from "../app.js";
 import { validateAndLoadConfig } from "../config.js";
+import { MockAiProvider } from "../services/ai/mockProvider.js";
 
 describe("Express Server Shell", () => {
   it("GET /api/health returns 200 and healthy status", async () => {
-    const app = createApp();
+    const app = createApp(new MockAiProvider());
     const response = await request(app)
       .get("/api/health")
       .expect(200);
@@ -16,7 +17,7 @@ describe("Express Server Shell", () => {
   });
 
   it("generates unique requestId for each request", async () => {
-    const app = createApp();
+    const app = createApp(new MockAiProvider());
     const res1 = await request(app).get("/api/health");
     const res2 = await request(app).get("/api/health");
 

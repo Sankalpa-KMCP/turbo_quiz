@@ -12,10 +12,17 @@ export type MockScenarioType =
 export class MockAiProvider implements AiProvider {
   private scenarios: MockScenarioType[] = [];
   private currentScenarioIndex = 0;
+  private defaultScenario?: MockScenarioType | (() => MockScenarioType);
 
-  constructor(options?: { scenarios?: MockScenarioType[] }) {
+  constructor(options?: {
+    scenarios?: MockScenarioType[];
+    defaultScenario?: MockScenarioType | (() => MockScenarioType);
+  }) {
     if (options?.scenarios) {
       this.scenarios = [...options.scenarios];
+    }
+    if (options?.defaultScenario) {
+      this.defaultScenario = options.defaultScenario;
     }
   }
 
@@ -32,14 +39,18 @@ export class MockAiProvider implements AiProvider {
     }
 
     // Retrieve active scenario
-    const scenario = this.scenarios[this.currentScenarioIndex];
+    let scenario = this.scenarios[this.currentScenarioIndex];
     if (!scenario) {
-      throw new AiError("No mock scenario configured for this request.");
-    }
-
-    // Increment index if we have multiple, otherwise stay on last one
-    if (this.currentScenarioIndex < this.scenarios.length - 1) {
-      this.currentScenarioIndex++;
+      if (this.defaultScenario) {
+        scenario = typeof this.defaultScenario === "function" ? this.defaultScenario() : this.defaultScenario;
+      } else {
+        throw new AiError("No mock scenario configured for this request.");
+      }
+    } else {
+      // Increment index if we have multiple, otherwise stay on last one
+      if (this.currentScenarioIndex < this.scenarios.length - 1) {
+        this.currentScenarioIndex++;
+      }
     }
 
     return this.executeScenario(scenario, responseSchema, signal);

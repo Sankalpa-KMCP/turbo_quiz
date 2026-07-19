@@ -4,6 +4,7 @@ export interface ServerConfig {
   AI_PROVIDER: string;
   AI_API_KEY?: string;
   AI_MODEL?: string;
+  AI_REQUESTS_PER_MINUTE: number;
 }
 
 export function validateAndLoadConfig(): ServerConfig {
@@ -27,11 +28,19 @@ export function validateAndLoadConfig(): ServerConfig {
     throw new Error(`Config validation error: AI_PROVIDER "${aiProvider}" is unsupported. Only "mock" is supported.`);
   }
 
+  const rpmStr = process.env.AI_REQUESTS_PER_MINUTE || "10";
+  const aiRequestsPerMinute = parseInt(rpmStr, 10);
+
+  if (isNaN(aiRequestsPerMinute) || aiRequestsPerMinute < 1) {
+    throw new Error("Config validation error: AI_REQUESTS_PER_MINUTE must be a valid integer greater than zero.");
+  }
+
   return {
     PORT: port,
     NODE_ENV: nodeEnv,
     AI_PROVIDER: aiProvider,
     AI_API_KEY: aiApiKey,
     AI_MODEL: aiModel,
+    AI_REQUESTS_PER_MINUTE: aiRequestsPerMinute,
   };
 }
